@@ -20,7 +20,7 @@
          apps sharing the uid). -->
     <string name="sharedUserLabel">Android Core Apps</string>
 
-    <!-- This is the label for the application that stores call-log data. -->
-    <string name="app_label">Call Log Storage</string>
+    <!-- This is the label for the application that stores backs up and restores the calllog. -->
+    <string name="app_label">Call Log Backup/Restore</string>
 
 </resources>
