@@ -114,10 +114,6 @@ public class CallLogBackupAgent extends BackupAgent {
     public void onBackup(ParcelFileDescriptor oldStateDescriptor, BackupDataOutput data,
             ParcelFileDescriptor newStateDescriptor) throws IOException {
 
-        if (UserManager.get(this).getUserHandle() == UserHandle.USER_OWNER) {
-            return;
-        }
-
         // Get the list of the previous calls IDs which were backed up.
         DataInputStream dataInput = new DataInputStream(
                 new FileInputStream(oldStateDescriptor.getFileDescriptor()));
@@ -145,10 +141,6 @@ public class CallLogBackupAgent extends BackupAgent {
     @Override
     public void onRestore(BackupDataInput data, int appVersionCode, ParcelFileDescriptor newState)
             throws IOException {
-        if (UserManager.get(this).getUserHandle() == UserHandle.USER_OWNER) {
-            return;
-        }
-
         if (isDebug()) {
             Log.d(TAG, "Performing Restore");
         }
@@ -227,8 +219,11 @@ public class CallLogBackupAgent extends BackupAgent {
     private void writeCallToProvider(Call call) {
         Long dataUsage = call.dataUsage == 0 ? null : call.dataUsage;
 
-        PhoneAccountHandle handle = new PhoneAccountHandle(
-                ComponentName.unflattenFromString(call.accountComponentName), call.accountId);
+        PhoneAccountHandle handle = null;
+        if (call.accountComponentName != null && call.accountId != null) {
+            handle = new PhoneAccountHandle(
+                    ComponentName.unflattenFromString(call.accountComponentName), call.accountId);
+        }
         Calls.addCall(null /* CallerInfo */, this, call.number, call.numberPresentation, call.type,
                 call.features, handle, call.date, (int) call.duration,
                 dataUsage, true /* addForAllUsers */);
