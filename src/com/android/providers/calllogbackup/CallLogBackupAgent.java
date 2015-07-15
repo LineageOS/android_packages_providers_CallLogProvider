@@ -84,14 +84,30 @@ public class CallLogBackupAgent extends BackupAgent {
         }
     }
 
+    static class OEMData {
+        String namespace;
+        byte[] bytes;
+
+        public OEMData(String namespace, byte[] bytes) {
+            this.namespace = namespace;
+            this.bytes = bytes == null ? ZERO_BYTE_ARRAY : bytes;
+        }
+    }
+
     private static final String TAG = "CallLogBackupAgent";
 
     /** Current version of CallLogBackup. Used to track the backup format. */
     @VisibleForTesting
-    static final int VERSION = 1001;
+    static final int VERSION = 1002;
     /** Version indicating that there exists no previous backup entry. */
     @VisibleForTesting
     static final int VERSION_NO_PREVIOUS_STATE = 0;
+
+    static final String NO_OEM_NAMESPACE = "no-oem-namespace";
+
+    static final byte[] ZERO_BYTE_ARRAY = new byte[0];
+
+    static final int END_OEM_DATA_MARKER = 0x60061E;
 
     private static final String[] CALL_LOG_PROJECTION = new String[] {
         CallLog.Calls._ID,
@@ -300,6 +316,21 @@ public class CallLogBackupAgent extends BackupAgent {
                 call.features = dataInput.readInt();
             }
 
+            if (version >= 1002) {
+                String namespace = dataInput.readUTF();
+                int length = dataInput.readInt();
+                byte[] buffer = new byte[length];
+                dataInput.read(buffer);
+                readOEMDataForCall(call, new OEMData(namespace, buffer));
+
+                int marker = dataInput.readInt();
+                if (marker != END_OEM_DATA_MARKER) {
+                    Log.e(TAG, "Did not find END-OEM marker for call " + call.id);
+                    // The marker does not match the expected value, ignore this call completely.
+                    return null;
+                }
+            }
+
             return call;
         } catch (IOException e) {
             Log.e(TAG, "Error reading call data for " + callId, e);
@@ -343,6 +374,13 @@ public class CallLogBackupAgent extends BackupAgent {
             writeString(data, call.accountAddress);
             data.writeLong(call.dataUsage == null ? 0 : call.dataUsage);
             data.writeInt(call.features);
+
+            OEMData oemData = getOEMDataForCall(call);
+            data.writeUTF(oemData.namespace);
+            data.writeInt(oemData.bytes.length);
+            data.write(oemData.bytes);
+            data.writeInt(END_OEM_DATA_MARKER + 1);
+
             data.flush();
 
             output.writeEntityHeader(Integer.toString(call.id), baos.size());
@@ -355,6 +393,73 @@ public class CallLogBackupAgent extends BackupAgent {
             Log.e(TAG, "Failed to backup call: " + call, e);
         }
     }
+
+    /**
+     * Allows OEMs to provide proprietary data to backup along with the rest of the call log
+     * data. Because there is no way to provide a Backup Transport implementation
+     * nor peek into the data format of backup entries without system-level permissions, it is
+     * not possible (at the time of this writing) to write CTS tests for this piece of code.
+     * It is, therefore, important that if you alter this portion of code that you
+     * test backup and restore of call log is working as expected; ideally this would be tested by
+     * backing up and restoring between two different Android phone devices running M+.
+     */
+    private OEMData getOEMDataForCall(Call call) {
+        return new OEMData(NO_OEM_NAMESPACE, ZERO_BYTE_ARRAY);
+
+        // OEMs that want to add their own proprietary data to call log backup should replace the
+        // code above with their own namespace and add any additional data they need.
+        // Versioning and size-prefixing the data should be done here as needed.
+        //
+        // Example:
+
+        /*
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        DataOutputStream data = new DataOutputStream(baos);
+
+        String customData1 = "Generic OEM";
+        int customData2 = 42;
+
+        // Write a version for the data
+        data.writeInt(OEM_DATA_VERSION);
+
+        // Write the data and flush
+        data.writeUTF(customData1);
+        data.writeInt(customData2);
+        data.flush();
+
+        String oemNamespace = "com.oem.namespace";
+        return new OEMData(oemNamespace, baos.toByteArray());
+        */
+    }
+
+    /**
+     * Allows OEMs to read their own proprietary data when doing a call log restore. It is important
+     * that the implementation verify the namespace of the data matches their expected value before
+     * attempting to read the data or else you may risk reading invalid data.
+     *
+     * See {@link #getOEMDataForCall} for information concerning proper testing of this code.
+     */
+    private void readOEMDataForCall(Call call, OEMData oemData) {
+        // OEMs that want to read proprietary data from a call log restore should do so here.
+        // Before reading from the data, an OEM should verify that the data matches their
+        // expected namespace.
+        //
+        // Example:
+
+        /*
+        if ("com.oem.expected.namespace".equals(oemData.namespace)) {
+            ByteArrayInputStream bais = new ByteArrayInputStream(oemData.bytes);
+            DataInputStream data = new DataInputStream(bais);
+
+            // Check against this version as we read data.
+            int version = data.readInt();
+            String customData1 = data.readUTF();
+            int customData2 = data.readInt();
+            // do something with data
+        }
+        */
+    }
+
 
     private void writeString(DataOutputStream data, String str) throws IOException {
         if (str == null) {
