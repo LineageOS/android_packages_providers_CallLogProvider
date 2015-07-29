@@ -379,7 +379,7 @@ public class CallLogBackupAgent extends BackupAgent {
             data.writeUTF(oemData.namespace);
             data.writeInt(oemData.bytes.length);
             data.write(oemData.bytes);
-            data.writeInt(END_OEM_DATA_MARKER + 1);
+            data.writeInt(END_OEM_DATA_MARKER);
 
             data.flush();
 
