@@ -242,7 +242,7 @@ public class CallLogBackupAgent extends BackupAgent {
         }
         Calls.addCall(null /* CallerInfo */, this, call.number, call.numberPresentation, call.type,
                 call.features, handle, call.date, (int) call.duration,
-                dataUsage, true /* addForAllUsers */);
+                dataUsage, true /* addForAllUsers */, true /* is_read */);
     }
 
     @VisibleForTesting
