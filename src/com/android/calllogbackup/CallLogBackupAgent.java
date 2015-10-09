@@ -14,19 +14,21 @@
  * limitations under the License
  */
 
-package com.android.providers.calllogbackup;
+package com.android.calllogbackup;
 
 import android.app.backup.BackupAgent;
 import android.app.backup.BackupDataInput;
 import android.app.backup.BackupDataOutput;
 import android.content.ComponentName;
 import android.content.ContentResolver;
+import android.content.Context;
 import android.database.Cursor;
 import android.os.ParcelFileDescriptor;
 import android.os.UserHandle;
 import android.os.UserManager;
 import android.provider.CallLog;
 import android.provider.CallLog.Calls;
+import android.provider.Settings;
 import android.telecom.PhoneAccountHandle;
 import android.util.Log;
 
@@ -96,6 +98,8 @@ public class CallLogBackupAgent extends BackupAgent {
 
     private static final String TAG = "CallLogBackupAgent";
 
+    private static final String USER_FULL_DATA_BACKUP_AWARE = "user_full_data_backup_aware";
+
     /** Current version of CallLogBackup. Used to track the backup format. */
     @VisibleForTesting
     static final int VERSION = 1002;
@@ -108,6 +112,7 @@ public class CallLogBackupAgent extends BackupAgent {
     static final byte[] ZERO_BYTE_ARRAY = new byte[0];
 
     static final int END_OEM_DATA_MARKER = 0x60061E;
+
 
     private static final String[] CALL_LOG_PROJECTION = new String[] {
         CallLog.Calls._ID,
@@ -129,6 +134,13 @@ public class CallLogBackupAgent extends BackupAgent {
     @Override
     public void onBackup(ParcelFileDescriptor oldStateDescriptor, BackupDataOutput data,
             ParcelFileDescriptor newStateDescriptor) throws IOException {
+
+        if (shouldPreventBackup(this)) {
+            if (isDebug()) {
+                Log.d(TAG, "Skipping onBackup");
+            }
+            return;
+        }
 
         // Get the list of the previous calls IDs which were backed up.
         DataInputStream dataInput = new DataInputStream(
@@ -157,6 +169,13 @@ public class CallLogBackupAgent extends BackupAgent {
     @Override
     public void onRestore(BackupDataInput data, int appVersionCode, ParcelFileDescriptor newState)
             throws IOException {
+        if (shouldPreventBackup(this)) {
+            if (isDebug()) {
+                Log.d(TAG, "Skipping restore");
+            }
+            return;
+        }
+
         if (isDebug()) {
             Log.d(TAG, "Performing Restore");
         }
@@ -484,6 +503,12 @@ public class CallLogBackupAgent extends BackupAgent {
         } catch (IOException e) {
             Log.e(TAG, "Failed to remove call: " + callId, e);
         }
+    }
+
+    static boolean shouldPreventBackup(Context context) {
+        // Check to see that the user is full-data aware before performing calllog backup.
+        return Settings.Secure.getInt(
+                context.getContentResolver(), USER_FULL_DATA_BACKUP_AWARE, 0) == 0;
     }
 
     private static boolean isDebug() {

@@ -14,27 +14,38 @@
  * limitations under the License
  */
 
-package com.android.providers.calllogbackup;
+package com.android.calllogbackup;
 
 import android.app.backup.BackupManager;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.provider.Settings;
+import android.util.Log;
 
 /**
  * Call Log Change Broadcast Receiver. Receives an intent when the call log provider changes
  * so that it triggers backup accordingly.
  */
 public class CallLogChangeReceiver extends BroadcastReceiver {
-
+    private static final String TAG = "CallLogChangeReceiver";
+    private static final boolean VDBG = Log.isLoggable(TAG, Log.VERBOSE);
     private static final String ACTION_CALL_LOG_CHANGE = "android.intent.action.CALL_LOG_CHANGE";
 
     /** ${inheritDoc} */
     @Override
     public void onReceive(Context context, Intent intent) {
         if (ACTION_CALL_LOG_CHANGE.equals(intent.getAction())) {
-            BackupManager bm = new BackupManager(context);
-            bm.dataChanged();
+
+            if (CallLogBackupAgent.shouldPreventBackup(context)) {
+                // User is not full-backup-data aware so we skip calllog backup until they are.
+                if (VDBG) {
+                    Log.v(TAG, "Skipping call log backup due to lack of full-data check.");
+                }
+            } else {
+                BackupManager bm = new BackupManager(context);
+                bm.dataChanged();
+            }
         }
     }
 

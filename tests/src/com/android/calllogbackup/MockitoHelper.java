@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.android.providers.calllogbackup;
+package com.android.calllogbackup;
 
 import android.util.Log;
 
