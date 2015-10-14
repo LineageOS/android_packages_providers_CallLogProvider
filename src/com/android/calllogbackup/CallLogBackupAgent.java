@@ -24,8 +24,6 @@ import android.content.ContentResolver;
 import android.content.Context;
 import android.database.Cursor;
 import android.os.ParcelFileDescriptor;
-import android.os.UserHandle;
-import android.os.UserManager;
 import android.provider.CallLog;
 import android.provider.CallLog.Calls;
 import android.provider.Settings;
@@ -67,6 +65,7 @@ public class CallLogBackupAgent extends BackupAgent {
         long date;
         long duration;
         String number;
+        String postDialDigits;
         int type;
         int numberPresentation;
         String accountComponentName;
@@ -119,6 +118,7 @@ public class CallLogBackupAgent extends BackupAgent {
         CallLog.Calls.DATE,
         CallLog.Calls.DURATION,
         CallLog.Calls.NUMBER,
+        CallLog.Calls.POST_DIAL_DIGITS,
         CallLog.Calls.TYPE,
         CallLog.Calls.COUNTRY_ISO,
         CallLog.Calls.GEOCODED_LOCATION,
@@ -259,9 +259,9 @@ public class CallLogBackupAgent extends BackupAgent {
             handle = new PhoneAccountHandle(
                     ComponentName.unflattenFromString(call.accountComponentName), call.accountId);
         }
-        Calls.addCall(null /* CallerInfo */, this, call.number, call.numberPresentation, call.type,
-                call.features, handle, call.date, (int) call.duration,
-                dataUsage, true /* addForAllUsers */, true /* is_read */);
+        Calls.addCall(null /* CallerInfo */, this, call.number, call.postDialDigits,
+                call.numberPresentation, call.type, call.features, handle, call.date,
+                (int) call.duration, dataUsage, true /* addForAllUsers */, true /* is_read */);
     }
 
     @VisibleForTesting
@@ -326,6 +326,7 @@ public class CallLogBackupAgent extends BackupAgent {
                 call.date = dataInput.readLong();
                 call.duration = dataInput.readLong();
                 call.number = readString(dataInput);
+                call.postDialDigits = readString(dataInput);
                 call.type = dataInput.readInt();
                 call.numberPresentation = dataInput.readInt();
                 call.accountComponentName = readString(dataInput);
@@ -363,6 +364,8 @@ public class CallLogBackupAgent extends BackupAgent {
         call.date = cursor.getLong(cursor.getColumnIndex(CallLog.Calls.DATE));
         call.duration = cursor.getLong(cursor.getColumnIndex(CallLog.Calls.DURATION));
         call.number = cursor.getString(cursor.getColumnIndex(CallLog.Calls.NUMBER));
+        call.postDialDigits = cursor.getString(
+                cursor.getColumnIndex(CallLog.Calls.POST_DIAL_DIGITS));
         call.type = cursor.getInt(cursor.getColumnIndex(CallLog.Calls.TYPE));
         call.numberPresentation =
                 cursor.getInt(cursor.getColumnIndex(CallLog.Calls.NUMBER_PRESENTATION));
@@ -386,6 +389,7 @@ public class CallLogBackupAgent extends BackupAgent {
             data.writeLong(call.date);
             data.writeLong(call.duration);
             writeString(data, call.number);
+            writeString(data, call.postDialDigits);
             data.writeInt(call.type);
             data.writeInt(call.numberPresentation);
             writeString(data, call.accountComponentName);
