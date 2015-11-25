@@ -24,6 +24,8 @@ import android.content.ContentResolver;
 import android.content.Context;
 import android.database.Cursor;
 import android.os.ParcelFileDescriptor;
+import android.os.UserHandle;
+import android.os.UserManager;
 import android.provider.CallLog;
 import android.provider.CallLog.Calls;
 import android.provider.Settings;
@@ -73,7 +75,7 @@ public class CallLogBackupAgent extends BackupAgent {
         String accountAddress;
         Long dataUsage;
         int features;
-
+        int addForAllUsers = 1;
         @Override
         public String toString() {
             if (isDebug()) {
@@ -101,7 +103,7 @@ public class CallLogBackupAgent extends BackupAgent {
 
     /** Current version of CallLogBackup. Used to track the backup format. */
     @VisibleForTesting
-    static final int VERSION = 1002;
+    static final int VERSION = 1003;
     /** Version indicating that there exists no previous backup entry. */
     @VisibleForTesting
     static final int VERSION_NO_PREVIOUS_STATE = 0;
@@ -127,7 +129,8 @@ public class CallLogBackupAgent extends BackupAgent {
         CallLog.Calls.PHONE_ACCOUNT_ID,
         CallLog.Calls.PHONE_ACCOUNT_ADDRESS,
         CallLog.Calls.DATA_USAGE,
-        CallLog.Calls.FEATURES
+        CallLog.Calls.FEATURES,
+        CallLog.Calls.ADD_FOR_ALL_USERS,
     };
 
     /** ${inheritDoc} */
@@ -259,9 +262,11 @@ public class CallLogBackupAgent extends BackupAgent {
             handle = new PhoneAccountHandle(
                     ComponentName.unflattenFromString(call.accountComponentName), call.accountId);
         }
+        boolean addForAllUsers = call.addForAllUsers == 1;
+        // We backup the calllog in the user running this backup agent, so write calls to this user.
         Calls.addCall(null /* CallerInfo */, this, call.number, call.postDialDigits,
                 call.numberPresentation, call.type, call.features, handle, call.date,
-                (int) call.duration, dataUsage, true /* addForAllUsers */, true /* is_read */);
+                (int) call.duration, dataUsage, addForAllUsers, null, true /* is_read */);
     }
 
     @VisibleForTesting
@@ -336,6 +341,10 @@ public class CallLogBackupAgent extends BackupAgent {
                 call.features = dataInput.readInt();
             }
 
+            if (version >= 1003) {
+                call.addForAllUsers = dataInput.readInt();
+            }
+
             if (version >= 1002) {
                 String namespace = dataInput.readUTF();
                 int length = dataInput.readInt();
@@ -377,6 +386,7 @@ public class CallLogBackupAgent extends BackupAgent {
                 cursor.getString(cursor.getColumnIndex(CallLog.Calls.PHONE_ACCOUNT_ADDRESS));
         call.dataUsage = cursor.getLong(cursor.getColumnIndex(CallLog.Calls.DATA_USAGE));
         call.features = cursor.getInt(cursor.getColumnIndex(CallLog.Calls.FEATURES));
+        call.addForAllUsers = cursor.getInt(cursor.getColumnIndex(Calls.ADD_FOR_ALL_USERS));
         return call;
     }
 
@@ -397,6 +407,7 @@ public class CallLogBackupAgent extends BackupAgent {
             writeString(data, call.accountAddress);
             data.writeLong(call.dataUsage == null ? 0 : call.dataUsage);
             data.writeInt(call.features);
+            data.writeInt(call.addForAllUsers);
 
             OEMData oemData = getOEMDataForCall(call);
             data.writeUTF(oemData.namespace);
