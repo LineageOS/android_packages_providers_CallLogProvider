@@ -67,7 +67,7 @@ public class CallLogBackupAgent extends BackupAgent {
         long date;
         long duration;
         String number;
-        String postDialDigits;
+        String postDialDigits = "";
         int type;
         int numberPresentation;
         String accountComponentName;
@@ -103,7 +103,7 @@ public class CallLogBackupAgent extends BackupAgent {
 
     /** Current version of CallLogBackup. Used to track the backup format. */
     @VisibleForTesting
-    static final int VERSION = 1003;
+    static final int VERSION = 1004;
     /** Version indicating that there exists no previous backup entry. */
     @VisibleForTesting
     static final int VERSION_NO_PREVIOUS_STATE = 0;
@@ -331,7 +331,6 @@ public class CallLogBackupAgent extends BackupAgent {
                 call.date = dataInput.readLong();
                 call.duration = dataInput.readLong();
                 call.number = readString(dataInput);
-                call.postDialDigits = readString(dataInput);
                 call.type = dataInput.readInt();
                 call.numberPresentation = dataInput.readInt();
                 call.accountComponentName = readString(dataInput);
@@ -339,10 +338,6 @@ public class CallLogBackupAgent extends BackupAgent {
                 call.accountAddress = readString(dataInput);
                 call.dataUsage = dataInput.readLong();
                 call.features = dataInput.readInt();
-            }
-
-            if (version >= 1003) {
-                call.addForAllUsers = dataInput.readInt();
             }
 
             if (version >= 1002) {
@@ -358,6 +353,14 @@ public class CallLogBackupAgent extends BackupAgent {
                     // The marker does not match the expected value, ignore this call completely.
                     return null;
                 }
+            }
+
+            if (version >= 1003) {
+                call.addForAllUsers = dataInput.readInt();
+            }
+
+            if (version >= 1004) {
+                call.postDialDigits = readString(dataInput);
             }
 
             return call;
@@ -399,7 +402,6 @@ public class CallLogBackupAgent extends BackupAgent {
             data.writeLong(call.date);
             data.writeLong(call.duration);
             writeString(data, call.number);
-            writeString(data, call.postDialDigits);
             data.writeInt(call.type);
             data.writeInt(call.numberPresentation);
             writeString(data, call.accountComponentName);
@@ -407,13 +409,16 @@ public class CallLogBackupAgent extends BackupAgent {
             writeString(data, call.accountAddress);
             data.writeLong(call.dataUsage == null ? 0 : call.dataUsage);
             data.writeInt(call.features);
-            data.writeInt(call.addForAllUsers);
 
             OEMData oemData = getOEMDataForCall(call);
             data.writeUTF(oemData.namespace);
             data.writeInt(oemData.bytes.length);
             data.write(oemData.bytes);
             data.writeInt(END_OEM_DATA_MARKER);
+
+            data.writeInt(call.addForAllUsers);
+
+            writeString(data, call.postDialDigits);
 
             data.flush();
 
