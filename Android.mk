@@ -11,7 +11,7 @@ LOCAL_SRC_FILES := $(call all-java-files-under, src)
 # leaving out code which is tested by other means (e.g. static libraries) that
 # would dilute the coverage results. These options do not affect regular
 # production builds.
-LOCAL_EMMA_COVERAGE_FILTER := +com.android.providers.calllogbackup.*
+LOCAL_EMMA_COVERAGE_FILTER := +com.android.calllogbackup.*
 
 LOCAL_PACKAGE_NAME := CallLogBackup
 LOCAL_CERTIFICATE := shared

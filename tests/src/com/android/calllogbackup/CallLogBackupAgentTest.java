@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.android.providers.calllogbackup;
+package com.android.calllogbackup;
 
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -25,8 +25,8 @@ import android.app.backup.BackupDataOutput;
 import android.test.AndroidTestCase;
 import android.test.suitebuilder.annotation.SmallTest;
 
-import com.android.providers.calllogbackup.CallLogBackupAgent.Call;
-import com.android.providers.calllogbackup.CallLogBackupAgent.CallLogBackupState;
+import com.android.calllogbackup.CallLogBackupAgent.Call;
+import com.android.calllogbackup.CallLogBackupAgent.CallLogBackupState;
 
 import org.mockito.InOrder;
 import org.mockito.Matchers;
