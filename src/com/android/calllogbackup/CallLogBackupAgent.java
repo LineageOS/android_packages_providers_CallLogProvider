@@ -23,6 +23,7 @@ import android.content.ComponentName;
 import android.content.ContentResolver;
 import android.content.Context;
 import android.database.Cursor;
+import android.os.Bundle;
 import android.os.ParcelFileDescriptor;
 import android.os.UserHandle;
 import android.os.UserManager;
@@ -74,6 +75,7 @@ public class CallLogBackupAgent extends BackupAgent {
         String accountAddress;
         Long dataUsage;
         int features;
+        Bundle extras;
 
         @Override
         public String toString() {
@@ -261,7 +263,7 @@ public class CallLogBackupAgent extends BackupAgent {
         }
         Calls.addCall(null /* CallerInfo */, this, call.number, call.numberPresentation, call.type,
                 call.features, handle, call.date, (int) call.duration,
-                dataUsage, true /* addForAllUsers */, true /* is_read */);
+                dataUsage, true /* addForAllUsers */, true /* is_read */, call.extras);
     }
 
     @VisibleForTesting
