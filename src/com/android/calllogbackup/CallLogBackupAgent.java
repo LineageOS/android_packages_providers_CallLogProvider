@@ -68,6 +68,7 @@ public class CallLogBackupAgent extends BackupAgent {
         long duration;
         String number;
         String postDialDigits = "";
+        String viaNumber = "";
         int type;
         int numberPresentation;
         String accountComponentName;
@@ -103,7 +104,7 @@ public class CallLogBackupAgent extends BackupAgent {
 
     /** Current version of CallLogBackup. Used to track the backup format. */
     @VisibleForTesting
-    static final int VERSION = 1004;
+    static final int VERSION = 1005;
     /** Version indicating that there exists no previous backup entry. */
     @VisibleForTesting
     static final int VERSION_NO_PREVIOUS_STATE = 0;
@@ -121,6 +122,7 @@ public class CallLogBackupAgent extends BackupAgent {
         CallLog.Calls.DURATION,
         CallLog.Calls.NUMBER,
         CallLog.Calls.POST_DIAL_DIGITS,
+        CallLog.Calls.VIA_NUMBER,
         CallLog.Calls.TYPE,
         CallLog.Calls.COUNTRY_ISO,
         CallLog.Calls.GEOCODED_LOCATION,
@@ -264,7 +266,7 @@ public class CallLogBackupAgent extends BackupAgent {
         }
         boolean addForAllUsers = call.addForAllUsers == 1;
         // We backup the calllog in the user running this backup agent, so write calls to this user.
-        Calls.addCall(null /* CallerInfo */, this, call.number, call.postDialDigits,
+        Calls.addCall(null /* CallerInfo */, this, call.number, call.postDialDigits, call.viaNumber,
                 call.numberPresentation, call.type, call.features, handle, call.date,
                 (int) call.duration, dataUsage, addForAllUsers, null, true /* is_read */);
     }
@@ -363,6 +365,10 @@ public class CallLogBackupAgent extends BackupAgent {
                 call.postDialDigits = readString(dataInput);
             }
 
+            if(version >= 1005) {
+                call.viaNumber = readString(dataInput);
+            }
+
             return call;
         } catch (IOException e) {
             Log.e(TAG, "Error reading call data for " + callId, e);
@@ -378,6 +384,7 @@ public class CallLogBackupAgent extends BackupAgent {
         call.number = cursor.getString(cursor.getColumnIndex(CallLog.Calls.NUMBER));
         call.postDialDigits = cursor.getString(
                 cursor.getColumnIndex(CallLog.Calls.POST_DIAL_DIGITS));
+        call.viaNumber = cursor.getString(cursor.getColumnIndex(CallLog.Calls.VIA_NUMBER));
         call.type = cursor.getInt(cursor.getColumnIndex(CallLog.Calls.TYPE));
         call.numberPresentation =
                 cursor.getInt(cursor.getColumnIndex(CallLog.Calls.NUMBER_PRESENTATION));
@@ -419,6 +426,8 @@ public class CallLogBackupAgent extends BackupAgent {
             data.writeInt(call.addForAllUsers);
 
             writeString(data, call.postDialDigits);
+
+            writeString(data, call.viaNumber);
 
             data.flush();
 
