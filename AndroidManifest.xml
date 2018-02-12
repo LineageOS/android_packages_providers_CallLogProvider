@@ -4,7 +4,7 @@
         android:sharedUserLabel="@string/sharedUserLabel">
 
     <application android:label="@string/app_label"
-        android:icon="@drawable/app_icon"
+        android:icon="@mipmap/ic_launcher"
         android:allowBackup="true"
         android:backupAgent="CallLogBackupAgent"
         android:usesCleartextTraffic="false">
