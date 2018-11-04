@@ -15,7 +15,7 @@
      limitations under the License.
 -->
 <resources xmlns:android="http://schemas.android.com/apk/res/android" xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
-  <!-- Label for this app's shared user ID (and thus for all other
+    <!-- Label for this app's shared user ID (and thus for all other
          apps sharing the uid). -->
-  <!-- This is the label for the application that stores backs up and restores the calllog. -->
+    <!-- This is the label for the application that stores backs up and restores the calllog. -->
 </resources>
