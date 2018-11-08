@@ -77,6 +77,9 @@ public class CallLogBackupAgent extends BackupAgent {
         Long dataUsage;
         int features;
         int addForAllUsers = 1;
+        int callBlockReason = Calls.BLOCK_REASON_NOT_BLOCKED;
+        String callScreeningAppName = null;
+        String callScreeningComponentName = null;
         @Override
         public String toString() {
             if (isDebug()) {
@@ -104,7 +107,7 @@ public class CallLogBackupAgent extends BackupAgent {
 
     /** Current version of CallLogBackup. Used to track the backup format. */
     @VisibleForTesting
-    static final int VERSION = 1005;
+    static final int VERSION = 1006;
     /** Version indicating that there exists no previous backup entry. */
     @VisibleForTesting
     static final int VERSION_NO_PREVIOUS_STATE = 0;
@@ -133,6 +136,9 @@ public class CallLogBackupAgent extends BackupAgent {
         CallLog.Calls.DATA_USAGE,
         CallLog.Calls.FEATURES,
         CallLog.Calls.ADD_FOR_ALL_USERS,
+        CallLog.Calls.BLOCK_REASON,
+        CallLog.Calls.CALL_SCREENING_APP_NAME,
+        CallLog.Calls.CALL_SCREENING_COMPONENT_NAME,
     };
 
     /** ${inheritDoc} */
@@ -261,8 +267,11 @@ public class CallLogBackupAgent extends BackupAgent {
         boolean addForAllUsers = call.addForAllUsers == 1;
         // We backup the calllog in the user running this backup agent, so write calls to this user.
         Calls.addCall(null /* CallerInfo */, this, call.number, call.postDialDigits, call.viaNumber,
-                call.numberPresentation, call.type, call.features, handle, call.date,
-                (int) call.duration, dataUsage, addForAllUsers, null, true /* is_read */);
+            call.numberPresentation, call.type, call.features, handle, call.date,
+            (int) call.duration, dataUsage, addForAllUsers, null, true /* isRead */,
+            call.callBlockReason /*callBlockReason*/,
+            call.callScreeningAppName /*callScreeningAppName*/,
+            call.callScreeningComponentName /*callScreeningComponentName*/);
     }
 
     @VisibleForTesting
@@ -363,6 +372,12 @@ public class CallLogBackupAgent extends BackupAgent {
                 call.viaNumber = readString(dataInput);
             }
 
+            if(version >= 1006) {
+                call.callBlockReason = dataInput.readInt();
+                call.callScreeningAppName = readString(dataInput);
+                call.callScreeningComponentName = readString(dataInput);
+            }
+
             return call;
         } catch (IOException e) {
             Log.e(TAG, "Error reading call data for " + callId, e);
@@ -391,6 +406,11 @@ public class CallLogBackupAgent extends BackupAgent {
         call.dataUsage = cursor.getLong(cursor.getColumnIndex(CallLog.Calls.DATA_USAGE));
         call.features = cursor.getInt(cursor.getColumnIndex(CallLog.Calls.FEATURES));
         call.addForAllUsers = cursor.getInt(cursor.getColumnIndex(Calls.ADD_FOR_ALL_USERS));
+        call.callBlockReason = cursor.getInt(cursor.getColumnIndex(CallLog.Calls.BLOCK_REASON));
+        call.callScreeningAppName = cursor
+            .getString(cursor.getColumnIndex(CallLog.Calls.CALL_SCREENING_APP_NAME));
+        call.callScreeningComponentName = cursor
+            .getString(cursor.getColumnIndex(CallLog.Calls.CALL_SCREENING_COMPONENT_NAME));
         return call;
     }
 
@@ -422,6 +442,10 @@ public class CallLogBackupAgent extends BackupAgent {
             writeString(data, call.postDialDigits);
 
             writeString(data, call.viaNumber);
+
+            data.writeInt(call.callBlockReason);
+            writeString(data, call.callScreeningAppName);
+            writeString(data, call.callScreeningComponentName);
 
             data.flush();
 
