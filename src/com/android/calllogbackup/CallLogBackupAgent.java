@@ -24,11 +24,10 @@ import android.content.ContentResolver;
 import android.content.Context;
 import android.database.Cursor;
 import android.os.ParcelFileDescriptor;
-import android.os.UserHandle;
-import android.os.UserManager;
 import android.provider.CallLog;
 import android.provider.CallLog.Calls;
 import android.provider.Settings;
+import android.telecom.CallIdentification;
 import android.telecom.PhoneAccountHandle;
 import android.util.Log;
 
@@ -80,6 +79,12 @@ public class CallLogBackupAgent extends BackupAgent {
         int callBlockReason = Calls.BLOCK_REASON_NOT_BLOCKED;
         String callScreeningAppName = null;
         String callScreeningComponentName = null;
+        String callIdPackageName = null;
+        String callIdAppName = null;
+        String callIdName = null;
+        String callIdDescription = null;
+        String callIdDetails = null;
+        Integer callIdNuisanceConfidence = null;
         @Override
         public String toString() {
             if (isDebug()) {
@@ -139,6 +144,12 @@ public class CallLogBackupAgent extends BackupAgent {
         CallLog.Calls.BLOCK_REASON,
         CallLog.Calls.CALL_SCREENING_APP_NAME,
         CallLog.Calls.CALL_SCREENING_COMPONENT_NAME,
+        CallLog.Calls.CALL_ID_PACKAGE_NAME,
+        CallLog.Calls.CALL_ID_APP_NAME,
+        CallLog.Calls.CALL_ID_NAME,
+        CallLog.Calls.CALL_ID_DESCRIPTION,
+        CallLog.Calls.CALL_ID_DETAILS,
+        CallLog.Calls.CALL_ID_NUISANCE_CONFIDENCE
     };
 
     /** ${inheritDoc} */
@@ -265,13 +276,24 @@ public class CallLogBackupAgent extends BackupAgent {
                     ComponentName.unflattenFromString(call.accountComponentName), call.accountId);
         }
         boolean addForAllUsers = call.addForAllUsers == 1;
+        CallIdentification callIdentification = null;
+        if (call.callIdPackageName != null && call.callIdAppName != null) {
+            callIdentification = new CallIdentification.Builder(call.callIdPackageName,
+                    call.callIdAppName)
+                    .setName(call.callIdName)
+                    .setDescription(call.callIdDescription)
+                    .setDetails(call.callIdDetails)
+                    .setNuisanceConfidence(call.callIdNuisanceConfidence)
+                    .build();
+        }
         // We backup the calllog in the user running this backup agent, so write calls to this user.
         Calls.addCall(null /* CallerInfo */, this, call.number, call.postDialDigits, call.viaNumber,
             call.numberPresentation, call.type, call.features, handle, call.date,
             (int) call.duration, dataUsage, addForAllUsers, null, true /* isRead */,
             call.callBlockReason /*callBlockReason*/,
             call.callScreeningAppName /*callScreeningAppName*/,
-            call.callScreeningComponentName /*callScreeningComponentName*/);
+            call.callScreeningComponentName /*callScreeningComponentName*/,
+            callIdentification);
     }
 
     @VisibleForTesting
@@ -377,7 +399,13 @@ public class CallLogBackupAgent extends BackupAgent {
                 call.callScreeningAppName = readString(dataInput);
                 call.callScreeningComponentName = readString(dataInput);
             }
-
+            if(version >= 1007) {
+                call.callIdPackageName = readString(dataInput);
+                call.callIdAppName = readString(dataInput);
+                call.callIdDescription = readString(dataInput);
+                call.callIdDetails = readString(dataInput);
+                call.callIdNuisanceConfidence = readInteger(dataInput);
+            }
             return call;
         } catch (IOException e) {
             Log.e(TAG, "Error reading call data for " + callId, e);
@@ -411,6 +439,22 @@ public class CallLogBackupAgent extends BackupAgent {
             .getString(cursor.getColumnIndex(CallLog.Calls.CALL_SCREENING_APP_NAME));
         call.callScreeningComponentName = cursor
             .getString(cursor.getColumnIndex(CallLog.Calls.CALL_SCREENING_COMPONENT_NAME));
+        call.callIdPackageName =
+                cursor.getString(cursor.getColumnIndex(Calls.CALL_ID_PACKAGE_NAME));
+        call.callIdAppName =
+                cursor.getString(cursor.getColumnIndex(Calls.CALL_ID_APP_NAME));
+        call.callIdName =
+                cursor.getString(cursor.getColumnIndex(Calls.CALL_ID_NAME));
+        call.callIdDescription =
+                cursor.getString(cursor.getColumnIndex(Calls.CALL_ID_DESCRIPTION));
+        call.callIdDetails =
+                cursor.getString(cursor.getColumnIndex(Calls.CALL_ID_DETAILS));
+        if (cursor.isNull(cursor.getColumnIndex(Calls.CALL_ID_NUISANCE_CONFIDENCE))) {
+            call.callIdNuisanceConfidence = null;
+        } else {
+            call.callIdNuisanceConfidence = cursor.getInt(cursor.getColumnIndex(
+                    Calls.CALL_ID_NUISANCE_CONFIDENCE));
+        }
         return call;
     }
 
@@ -446,6 +490,13 @@ public class CallLogBackupAgent extends BackupAgent {
             data.writeInt(call.callBlockReason);
             writeString(data, call.callScreeningAppName);
             writeString(data, call.callScreeningComponentName);
+
+            writeString(data, call.callIdPackageName);
+            writeString(data, call.callIdAppName);
+            writeString(data, call.callIdName);
+            writeString(data, call.callIdDescription);
+            writeString(data, call.callIdDetails);
+            writeInteger(data, call.callIdNuisanceConfidence);
 
             data.flush();
 
@@ -539,6 +590,23 @@ public class CallLogBackupAgent extends BackupAgent {
     private String readString(DataInputStream data) throws IOException {
         if (data.readBoolean()) {
             return data.readUTF();
+        } else {
+            return null;
+        }
+    }
+
+    private void writeInteger(DataOutputStream data, Integer num) throws IOException {
+        if (num == null) {
+            data.writeBoolean(false);
+        } else {
+            data.writeBoolean(true);
+            data.writeInt(num);
+        }
+    }
+
+    private Integer readInteger(DataInputStream data) throws IOException {
+        if (data.readBoolean()) {
+            return data.readInt();
         } else {
             return null;
         }
