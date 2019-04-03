@@ -27,7 +27,6 @@ import android.os.ParcelFileDescriptor;
 import android.provider.CallLog;
 import android.provider.CallLog.Calls;
 import android.provider.Settings;
-import android.telecom.CallIdentification;
 import android.telecom.PhoneAccountHandle;
 import android.util.Log;
 
@@ -79,12 +78,7 @@ public class CallLogBackupAgent extends BackupAgent {
         int callBlockReason = Calls.BLOCK_REASON_NOT_BLOCKED;
         String callScreeningAppName = null;
         String callScreeningComponentName = null;
-        String callIdPackageName = null;
-        String callIdAppName = null;
-        String callIdName = null;
-        String callIdDescription = null;
-        String callIdDetails = null;
-        Integer callIdNuisanceConfidence = null;
+
         @Override
         public String toString() {
             if (isDebug()) {
@@ -112,7 +106,7 @@ public class CallLogBackupAgent extends BackupAgent {
 
     /** Current version of CallLogBackup. Used to track the backup format. */
     @VisibleForTesting
-    static final int VERSION = 1006;
+    static final int VERSION = 1007;
     /** Version indicating that there exists no previous backup entry. */
     @VisibleForTesting
     static final int VERSION_NO_PREVIOUS_STATE = 0;
@@ -143,13 +137,7 @@ public class CallLogBackupAgent extends BackupAgent {
         CallLog.Calls.ADD_FOR_ALL_USERS,
         CallLog.Calls.BLOCK_REASON,
         CallLog.Calls.CALL_SCREENING_APP_NAME,
-        CallLog.Calls.CALL_SCREENING_COMPONENT_NAME,
-        CallLog.Calls.CALL_ID_PACKAGE_NAME,
-        CallLog.Calls.CALL_ID_APP_NAME,
-        CallLog.Calls.CALL_ID_NAME,
-        CallLog.Calls.CALL_ID_DESCRIPTION,
-        CallLog.Calls.CALL_ID_DETAILS,
-        CallLog.Calls.CALL_ID_NUISANCE_CONFIDENCE
+        CallLog.Calls.CALL_SCREENING_COMPONENT_NAME
     };
 
     /** ${inheritDoc} */
@@ -276,24 +264,13 @@ public class CallLogBackupAgent extends BackupAgent {
                     ComponentName.unflattenFromString(call.accountComponentName), call.accountId);
         }
         boolean addForAllUsers = call.addForAllUsers == 1;
-        CallIdentification callIdentification = null;
-        if (call.callIdPackageName != null && call.callIdAppName != null) {
-            callIdentification = new CallIdentification.Builder(call.callIdPackageName,
-                    call.callIdAppName)
-                    .setName(call.callIdName)
-                    .setDescription(call.callIdDescription)
-                    .setDetails(call.callIdDetails)
-                    .setNuisanceConfidence(call.callIdNuisanceConfidence)
-                    .build();
-        }
         // We backup the calllog in the user running this backup agent, so write calls to this user.
         Calls.addCall(null /* CallerInfo */, this, call.number, call.postDialDigits, call.viaNumber,
             call.numberPresentation, call.type, call.features, handle, call.date,
             (int) call.duration, dataUsage, addForAllUsers, null, true /* isRead */,
             call.callBlockReason /*callBlockReason*/,
             call.callScreeningAppName /*callScreeningAppName*/,
-            call.callScreeningComponentName /*callScreeningComponentName*/,
-            callIdentification);
+            call.callScreeningComponentName /*callScreeningComponentName*/);
     }
 
     @VisibleForTesting
@@ -400,11 +377,13 @@ public class CallLogBackupAgent extends BackupAgent {
                 call.callScreeningComponentName = readString(dataInput);
             }
             if(version >= 1007) {
-                call.callIdPackageName = readString(dataInput);
-                call.callIdAppName = readString(dataInput);
-                call.callIdDescription = readString(dataInput);
-                call.callIdDetails = readString(dataInput);
-                call.callIdNuisanceConfidence = readInteger(dataInput);
+                // Version 1007 had call id columns early in the Q release; they were pulled so we
+                // will just read the values out here if they exist in a backup and ignore them.
+                readString(dataInput);
+                readString(dataInput);
+                readString(dataInput);
+                readString(dataInput);
+                readInteger(dataInput);
             }
             return call;
         } catch (IOException e) {
@@ -439,22 +418,6 @@ public class CallLogBackupAgent extends BackupAgent {
             .getString(cursor.getColumnIndex(CallLog.Calls.CALL_SCREENING_APP_NAME));
         call.callScreeningComponentName = cursor
             .getString(cursor.getColumnIndex(CallLog.Calls.CALL_SCREENING_COMPONENT_NAME));
-        call.callIdPackageName =
-                cursor.getString(cursor.getColumnIndex(Calls.CALL_ID_PACKAGE_NAME));
-        call.callIdAppName =
-                cursor.getString(cursor.getColumnIndex(Calls.CALL_ID_APP_NAME));
-        call.callIdName =
-                cursor.getString(cursor.getColumnIndex(Calls.CALL_ID_NAME));
-        call.callIdDescription =
-                cursor.getString(cursor.getColumnIndex(Calls.CALL_ID_DESCRIPTION));
-        call.callIdDetails =
-                cursor.getString(cursor.getColumnIndex(Calls.CALL_ID_DETAILS));
-        if (cursor.isNull(cursor.getColumnIndex(Calls.CALL_ID_NUISANCE_CONFIDENCE))) {
-            call.callIdNuisanceConfidence = null;
-        } else {
-            call.callIdNuisanceConfidence = cursor.getInt(cursor.getColumnIndex(
-                    Calls.CALL_ID_NUISANCE_CONFIDENCE));
-        }
         return call;
     }
 
@@ -491,12 +454,14 @@ public class CallLogBackupAgent extends BackupAgent {
             writeString(data, call.callScreeningAppName);
             writeString(data, call.callScreeningComponentName);
 
-            writeString(data, call.callIdPackageName);
-            writeString(data, call.callIdAppName);
-            writeString(data, call.callIdName);
-            writeString(data, call.callIdDescription);
-            writeString(data, call.callIdDetails);
-            writeInteger(data, call.callIdNuisanceConfidence);
+            // Step 1007 used to write caller ID data; those were pulled.  Keeping that in here
+            // to maintain compatibility for backups which had this data.
+            writeString(data, "");
+            writeString(data, "");
+            writeString(data, "");
+            writeString(data, "");
+            writeString(data, "");
+            writeInteger(data, null);
 
             data.flush();
 
