@@ -383,6 +383,7 @@ public class CallLogBackupAgent extends BackupAgent {
                 readString(dataInput);
                 readString(dataInput);
                 readString(dataInput);
+                readString(dataInput);
                 readInteger(dataInput);
             }
             return call;
