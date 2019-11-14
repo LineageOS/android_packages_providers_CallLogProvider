@@ -16,6 +16,8 @@
 
 package com.android.calllogbackup;
 
+import static android.provider.CallLog.Calls.MISSED_REASON_NOT_MISSED;
+
 import android.app.backup.BackupAgent;
 import android.app.backup.BackupDataInput;
 import android.app.backup.BackupDataOutput;
@@ -78,6 +80,7 @@ public class CallLogBackupAgent extends BackupAgent {
         int callBlockReason = Calls.BLOCK_REASON_NOT_BLOCKED;
         String callScreeningAppName = null;
         String callScreeningComponentName = null;
+        long missedReason = MISSED_REASON_NOT_MISSED;
 
         @Override
         public String toString() {
@@ -106,7 +109,7 @@ public class CallLogBackupAgent extends BackupAgent {
 
     /** Current version of CallLogBackup. Used to track the backup format. */
     @VisibleForTesting
-    static final int VERSION = 1007;
+    static final int VERSION = 1008;
     /** Version indicating that there exists no previous backup entry. */
     @VisibleForTesting
     static final int VERSION_NO_PREVIOUS_STATE = 0;
@@ -137,7 +140,8 @@ public class CallLogBackupAgent extends BackupAgent {
         CallLog.Calls.ADD_FOR_ALL_USERS,
         CallLog.Calls.BLOCK_REASON,
         CallLog.Calls.CALL_SCREENING_APP_NAME,
-        CallLog.Calls.CALL_SCREENING_COMPONENT_NAME
+        CallLog.Calls.CALL_SCREENING_COMPONENT_NAME,
+        CallLog.Calls.MISSED_REASON
     };
 
     /** ${inheritDoc} */
@@ -270,7 +274,8 @@ public class CallLogBackupAgent extends BackupAgent {
             (int) call.duration, dataUsage, addForAllUsers, null, true /* isRead */,
             call.callBlockReason /*callBlockReason*/,
             call.callScreeningAppName /*callScreeningAppName*/,
-            call.callScreeningComponentName /*callScreeningComponentName*/);
+            call.callScreeningComponentName /*callScreeningComponentName*/,
+            call.missedReason);
     }
 
     @VisibleForTesting
@@ -386,6 +391,9 @@ public class CallLogBackupAgent extends BackupAgent {
                 readString(dataInput);
                 readInteger(dataInput);
             }
+            if (version >= 1008) {
+                call.missedReason = dataInput.readLong();
+            }
             return call;
         } catch (IOException e) {
             Log.e(TAG, "Error reading call data for " + callId, e);
@@ -419,6 +427,8 @@ public class CallLogBackupAgent extends BackupAgent {
             .getString(cursor.getColumnIndex(CallLog.Calls.CALL_SCREENING_APP_NAME));
         call.callScreeningComponentName = cursor
             .getString(cursor.getColumnIndex(CallLog.Calls.CALL_SCREENING_COMPONENT_NAME));
+        call.missedReason = cursor
+            .getInt(cursor.getColumnIndex(CallLog.Calls.MISSED_REASON));
         return call;
     }
 
@@ -463,6 +473,8 @@ public class CallLogBackupAgent extends BackupAgent {
             writeString(data, "");
             writeString(data, "");
             writeInteger(data, null);
+
+            data.writeLong(call.missedReason);
 
             data.flush();
 
