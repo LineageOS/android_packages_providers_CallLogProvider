@@ -6,7 +6,6 @@
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
 
     <application android:label="@string/app_label"
-        android:icon="@drawable/app_icon"
         android:allowBackup="true"
         android:backupAgent="CallLogBackupAgent"
         android:usesCleartextTraffic="false">
