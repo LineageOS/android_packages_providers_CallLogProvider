@@ -8,6 +8,7 @@
     <application android:label="@string/app_label"
         android:allowBackup="true"
         android:backupAgent="CallLogBackupAgent"
+        android:forceQueryable="true"
         android:usesCleartextTraffic="false">
 
         <meta-data android:name="com.google.android.backup.api_key"
