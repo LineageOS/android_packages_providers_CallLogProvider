@@ -13,6 +13,7 @@
                 android:value="AEdPqrEAAAAIVhVYJjcc4bozis7qBfzzgREFk3nIkWGNc5VaRg" />
 
         <receiver android:name="CallLogChangeReceiver"
+                android:exported="true"
                 android:permission="android.permission.SEND_CALL_LOG_CHANGE">
             <!-- Sent when the call log changes.  We use it to trigger a backup request. -->
             <intent-filter>
