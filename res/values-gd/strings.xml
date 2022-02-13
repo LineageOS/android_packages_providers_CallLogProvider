@@ -14,5 +14,6 @@
      limitations under the License.
 -->
 <resources xmlns:android="http://schemas.android.com/apk/res/android" xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
-    <string name="sharedUserLabel">Aplicaciones básiques d\'Android</string>
+    <string name="sharedUserLabel">Prìomh-aplacaidean Android</string>
+    <string name="app_label">Lethbhreac-glèidhidh/Aiseag loga nan gairmean</string>
 </resources>
