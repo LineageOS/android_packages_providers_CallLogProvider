@@ -5,7 +5,6 @@ package {
 
 android_test {
     name: "CallLogBackupTests",
-    static_libs: ["mockito-target"],
     libs: [
         "android.test.runner",
         "android.test.base",
@@ -18,4 +17,9 @@ android_test {
     optimize: {
         enabled: false,
     },
+
+    static_libs: [
+        "mockito-target",
+        "androidx.test.rules",
+    ],
 }
