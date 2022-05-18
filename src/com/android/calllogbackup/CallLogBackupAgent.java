@@ -502,7 +502,10 @@ public class CallLogBackupAgent extends BackupAgent {
                 iccId = mSubscriptionInfoMap.get(Integer.parseInt(call.accountId));
             } catch (NullPointerException e) {
                 // Ignore, iccId will be null;
+            } catch(NumberFormatException e) {
+                // Ignore, iccId will be null;
             }
+
             if (iccId != null) {
                 Log.i(TAG, "processing PhoneAccountMigration Found Subid during Backup: "
                         + call.accountId);
