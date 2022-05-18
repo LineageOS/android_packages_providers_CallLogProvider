@@ -448,7 +448,8 @@ public class CallLogBackupAgent extends BackupAgent {
             Log.e(TAG, "Subscription database is not available.");
             return false;
         }
-        if (accountComponentName.equals(TELEPHONY_PHONE_ACCOUNT_HANDLE_COMPONENT_NAME)
+        if (accountComponentName != null
+                && accountComponentName.equals(TELEPHONY_PHONE_ACCOUNT_HANDLE_COMPONENT_NAME)
                 && isPhoneAccountMigrationPending != 1) {
             return true;
         }
@@ -501,7 +502,10 @@ public class CallLogBackupAgent extends BackupAgent {
                 iccId = mSubscriptionInfoMap.get(Integer.parseInt(call.accountId));
             } catch (NullPointerException e) {
                 // Ignore, iccId will be null;
+            } catch(NumberFormatException e) {
+                // Ignore, iccId will be null;
             }
+
             if (iccId != null) {
                 Log.i(TAG, "processing PhoneAccountMigration Found Subid during Backup: "
                         + call.accountId);
