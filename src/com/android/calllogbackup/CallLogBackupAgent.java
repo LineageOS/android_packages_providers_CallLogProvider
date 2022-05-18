@@ -448,7 +448,8 @@ public class CallLogBackupAgent extends BackupAgent {
             Log.e(TAG, "Subscription database is not available.");
             return false;
         }
-        if (accountComponentName.equals(TELEPHONY_PHONE_ACCOUNT_HANDLE_COMPONENT_NAME)
+        if (accountComponentName != null
+                && accountComponentName.equals(TELEPHONY_PHONE_ACCOUNT_HANDLE_COMPONENT_NAME)
                 && isPhoneAccountMigrationPending != 1) {
             return true;
         }
