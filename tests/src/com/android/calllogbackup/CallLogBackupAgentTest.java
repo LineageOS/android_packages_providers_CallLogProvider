@@ -217,6 +217,53 @@ public class CallLogBackupAgentTest extends AndroidTestCase {
         assertEquals(0, call.isPhoneAccountMigrationPending);
     }
 
+    public void testReadCallFromCursor_WithNullAccountComponentName() throws Exception {
+        testReadCallFromCursor_WithNullField(CallLog.Calls.PHONE_ACCOUNT_COMPONENT_NAME);
+    }
+
+    public void testReadCallFromCursor_WithNullNumber() throws Exception {
+        testReadCallFromCursor_WithNullField(CallLog.Calls.NUMBER);
+    }
+
+    public void testReadCallFromCursor_WithNullPostDialDigits() throws Exception {
+        testReadCallFromCursor_WithNullField(CallLog.Calls.POST_DIAL_DIGITS);
+    }
+
+    public void testReadCallFromCursor_WithNullViaNumber() throws Exception {
+        testReadCallFromCursor_WithNullField(CallLog.Calls.VIA_NUMBER);
+    }
+
+    public void testReadCallFromCursor_WithNullPhoneAccountId() throws Exception {
+        testReadCallFromCursor_WithNullField(CallLog.Calls.PHONE_ACCOUNT_ID);
+    }
+
+    public void testReadCallFromCursor_WithNullCallAccountAddress() throws Exception {
+        testReadCallFromCursor_WithNullField(CallLog.Calls.PHONE_ACCOUNT_ADDRESS);
+    }
+
+    public void testReadCallFromCursor_WithNullCallScreeningAppName() throws Exception {
+        testReadCallFromCursor_WithNullField(CallLog.Calls.CALL_SCREENING_APP_NAME);
+    }
+
+    public void testReadCallFromCursor_WithNullCallScreeningComponentName() throws Exception {
+        testReadCallFromCursor_WithNullField(CallLog.Calls.CALL_SCREENING_COMPONENT_NAME);
+    }
+
+    public void testReadCallFromCursor_WithNullMissedReason() throws Exception {
+        testReadCallFromCursor_WithNullField(CallLog.Calls.MISSED_REASON);
+    }
+
+    private void testReadCallFromCursor_WithNullField(String field) throws Exception {
+        Map<Integer, String> subscriptionInfoMap = new HashMap<>();
+        subscriptionInfoMap.put(TEST_PHONE_ACCOUNT_HANDLE_SUB_ID_INT,
+            TEST_PHONE_ACCOUNT_HANDLE_ICC_ID);
+        mCallLogBackupAgent.mSubscriptionInfoMap = subscriptionInfoMap;
+
+        //read from cursor and not throw exception
+        mockCursorWithNullFields(mCursor, field);
+        Call call = mCallLogBackupAgent.readCallFromCursor(mCursor);
+    }
+
     public void testRunBackup_MultipleCall() throws Exception {
         CallLogBackupState state = new CallLogBackupState();
         state.version = CallLogBackupAgent.VERSION;
@@ -383,6 +430,178 @@ public class CallLogBackupAgentTest extends AndroidTestCase {
                 CALLS_IS_PHONE_ACCOUNT_MIGRATION_PENDING_COLUMN_INDEX);
         when(cursor.getInt(CALLS_IS_PHONE_ACCOUNT_MIGRATION_PENDING_COLUMN_INDEX)).thenReturn(
                 CALL_IS_PHONE_ACCOUNT_MIGRATION_PENDING);
+    }
+
+    //sets up the mock cursor with specified column data (string) set to null
+    private static void mockCursorWithNullFields(Cursor cursor, String columnToNullify) {
+        when(cursor.moveToNext()).thenReturn(true).thenReturn(false);
+
+        int CALLS_ID_COLUMN_INDEX = 1;
+        int CALL_ID = 9;
+        when(cursor.getColumnIndex(CallLog.Calls._ID)).thenReturn(CALLS_ID_COLUMN_INDEX);
+        when(cursor.getInt(CALLS_ID_COLUMN_INDEX)).thenReturn(CALL_ID);
+
+        int CALLS_DATE_COLUMN_INDEX = 2;
+        long CALL_DATE = 20991231;
+        when(cursor.getColumnIndex(CallLog.Calls.DATE)).thenReturn(CALLS_DATE_COLUMN_INDEX);
+        when(cursor.getLong(CALLS_DATE_COLUMN_INDEX)).thenReturn(CALL_DATE);
+
+        int CALLS_DURATION_COLUMN_INDEX = 3;
+        long CALL_DURATION = 987654321;
+        when(cursor.getColumnIndex(CallLog.Calls.DURATION)).thenReturn(
+            CALLS_DURATION_COLUMN_INDEX);
+        when(cursor.getLong(CALLS_DURATION_COLUMN_INDEX)).thenReturn(CALL_DURATION);
+
+        int CALLS_NUMBER_COLUMN_INDEX = 4;
+        String CALL_NUMBER = "6316056461";
+        when(cursor.getColumnIndex(CallLog.Calls.NUMBER)).thenReturn(
+            CALLS_NUMBER_COLUMN_INDEX);
+        if (CallLog.Calls.NUMBER.equals(columnToNullify)) {
+            when(cursor.getString(CALLS_NUMBER_COLUMN_INDEX)).thenReturn(null);
+        } else {
+            when(cursor.getString(CALLS_NUMBER_COLUMN_INDEX)).thenReturn(CALL_NUMBER);
+        }
+
+        int CALLS_POST_DIAL_DIGITS_COLUMN_INDEX = 5;
+        String CALL_POST_DIAL_DIGITS = "54321";
+        when(cursor.getColumnIndex(CallLog.Calls.POST_DIAL_DIGITS)).thenReturn(
+            CALLS_POST_DIAL_DIGITS_COLUMN_INDEX);
+        if (CallLog.Calls.POST_DIAL_DIGITS.equals(columnToNullify)) {
+            when(cursor.getString(CALLS_POST_DIAL_DIGITS_COLUMN_INDEX)).thenReturn(
+                null);
+        } else {
+            when(cursor.getString(CALLS_POST_DIAL_DIGITS_COLUMN_INDEX)).thenReturn(
+                CALL_POST_DIAL_DIGITS);
+        }
+
+        int CALLS_VIA_NUMBER_COLUMN_INDEX = 6;
+        String CALL_VIA_NUMBER = "via_number";
+        when(cursor.getColumnIndex(CallLog.Calls.VIA_NUMBER)).thenReturn(
+            CALLS_VIA_NUMBER_COLUMN_INDEX);
+        if (CallLog.Calls.VIA_NUMBER.equals(columnToNullify)) {
+            when(cursor.getString(CALLS_VIA_NUMBER_COLUMN_INDEX)).thenReturn(
+                null);
+        } else {
+            when(cursor.getString(CALLS_VIA_NUMBER_COLUMN_INDEX)).thenReturn(
+                CALL_VIA_NUMBER);
+        }
+
+        int CALLS_TYPE_COLUMN_INDEX = 7;
+        int CALL_TYPE = CallLog.Calls.OUTGOING_TYPE;
+        when(cursor.getColumnIndex(CallLog.Calls.TYPE)).thenReturn(CALLS_TYPE_COLUMN_INDEX);
+        when(cursor.getInt(CALLS_TYPE_COLUMN_INDEX)).thenReturn(CALL_TYPE);
+
+        int CALLS_NUMBER_PRESENTATION_COLUMN_INDEX = 8;
+        int CALL_NUMBER_PRESENTATION = CallLog.Calls.PRESENTATION_ALLOWED;
+        when(cursor.getColumnIndex(CallLog.Calls.NUMBER_PRESENTATION)).thenReturn(
+            CALLS_NUMBER_PRESENTATION_COLUMN_INDEX);
+        when(cursor.getInt(CALLS_NUMBER_PRESENTATION_COLUMN_INDEX)).thenReturn(
+            CALL_NUMBER_PRESENTATION);
+
+        int CALLS_ACCOUNT_COMPONENT_NAME_COLUMN_INDEX = 9;
+        String CALL_ACCOUNT_COMPONENT_NAME = TELEPHONY_COMPONENT;
+        when(cursor.getColumnIndex(CallLog.Calls.PHONE_ACCOUNT_COMPONENT_NAME)).thenReturn(
+            CALLS_ACCOUNT_COMPONENT_NAME_COLUMN_INDEX);
+        if (CallLog.Calls.PHONE_ACCOUNT_COMPONENT_NAME.equals(columnToNullify)) {
+            when(cursor.getString(CALLS_ACCOUNT_COMPONENT_NAME_COLUMN_INDEX)).thenReturn(
+                null);
+        } else {
+            when(cursor.getString(CALLS_ACCOUNT_COMPONENT_NAME_COLUMN_INDEX)).thenReturn(
+                CALL_ACCOUNT_COMPONENT_NAME);
+        }
+
+        int CALLS_ACCOUNT_ID_COLUMN_INDEX = 10;
+        String CALL_ACCOUNT_ID = TEST_PHONE_ACCOUNT_HANDLE_SUB_ID;
+        when(cursor.getColumnIndex(CallLog.Calls.PHONE_ACCOUNT_ID)).thenReturn(
+            CALLS_ACCOUNT_ID_COLUMN_INDEX);
+        if (CallLog.Calls.PHONE_ACCOUNT_ID.equals(columnToNullify)) {
+            when(cursor.getString(CALLS_ACCOUNT_ID_COLUMN_INDEX)).thenReturn(
+                null);
+        } else {
+            when(cursor.getString(CALLS_ACCOUNT_ID_COLUMN_INDEX)).thenReturn(
+                CALL_ACCOUNT_ID);
+        }
+
+        int CALLS_ACCOUNT_ADDRESS_COLUMN_INDEX = 11;
+        String CALL_ACCOUNT_ADDRESS = "CALL_ACCOUNT_ADDRESS";
+        when(cursor.getColumnIndex(CallLog.Calls.PHONE_ACCOUNT_ADDRESS)).thenReturn(
+            CALLS_ACCOUNT_ADDRESS_COLUMN_INDEX);
+        if (CallLog.Calls.PHONE_ACCOUNT_ADDRESS.equals(columnToNullify)) {
+            when(cursor.getString(CALLS_ACCOUNT_ADDRESS_COLUMN_INDEX)).thenReturn(
+                null);
+        } else {
+            when(cursor.getString(CALLS_ACCOUNT_ADDRESS_COLUMN_INDEX)).thenReturn(
+                CALL_ACCOUNT_ADDRESS);
+        }
+
+        int CALLS_DATA_USAGE_COLUMN_INDEX = 12;
+        long CALL_DATA_USAGE = 987654321;
+        when(cursor.getColumnIndex(CallLog.Calls.DATA_USAGE)).thenReturn(
+            CALLS_DATA_USAGE_COLUMN_INDEX);
+        when(cursor.getLong(CALLS_DATA_USAGE_COLUMN_INDEX)).thenReturn(CALL_DATA_USAGE);
+
+        int CALLS_FEATURES_COLUMN_INDEX = 13;
+        int CALL_FEATURES = 777;
+        when(cursor.getColumnIndex(CallLog.Calls.FEATURES)).thenReturn(
+            CALLS_FEATURES_COLUMN_INDEX);
+        when(cursor.getInt(CALLS_FEATURES_COLUMN_INDEX)).thenReturn(CALL_FEATURES);
+
+        int CALLS_ADD_FOR_ALL_USERS_COLUMN_INDEX = 14;
+        int CALL_ADD_FOR_ALL_USERS = 1;
+        when(cursor.getColumnIndex(CallLog.Calls.ADD_FOR_ALL_USERS)).thenReturn(
+            CALLS_ADD_FOR_ALL_USERS_COLUMN_INDEX);
+        when(cursor.getInt(CALLS_ADD_FOR_ALL_USERS_COLUMN_INDEX)).thenReturn(
+            CALL_ADD_FOR_ALL_USERS);
+
+        int CALLS_BLOCK_REASON_COLUMN_INDEX = 15;
+        int CALL_BLOCK_REASON = CallLog.Calls.BLOCK_REASON_NOT_BLOCKED;
+        when(cursor.getColumnIndex(CallLog.Calls.BLOCK_REASON)).thenReturn(
+            CALLS_BLOCK_REASON_COLUMN_INDEX);
+        when(cursor.getInt(CALLS_BLOCK_REASON_COLUMN_INDEX)).thenReturn(
+            CALL_BLOCK_REASON);
+
+        int CALLS_CALL_SCREENING_APP_NAME_COLUMN_INDEX = 16;
+        String CALL_CALL_SCREENING_APP_NAME = "CALL_CALL_SCREENING_APP_NAME";
+        when(cursor.getColumnIndex(CallLog.Calls.CALL_SCREENING_APP_NAME)).thenReturn(
+            CALLS_CALL_SCREENING_APP_NAME_COLUMN_INDEX);
+        if (CallLog.Calls.CALL_SCREENING_APP_NAME.equals(columnToNullify)) {
+            when(cursor.getString(CALLS_CALL_SCREENING_APP_NAME_COLUMN_INDEX)).thenReturn(
+                null);
+        } else {
+            when(cursor.getString(CALLS_CALL_SCREENING_APP_NAME_COLUMN_INDEX)).thenReturn(
+                CALL_CALL_SCREENING_APP_NAME);
+        }
+
+        int CALLS_CALL_SCREENING_COMPONENT_NAME_COLUMN_INDEX = 17;
+        String CALL_CALL_SCREENING_COMPONENT_NAME = "CALL_CALL_SCREENING_COMPONENT_NAME";
+        when(cursor.getColumnIndex(CallLog.Calls.CALL_SCREENING_COMPONENT_NAME)).thenReturn(
+            CALLS_CALL_SCREENING_COMPONENT_NAME_COLUMN_INDEX);
+        if (CallLog.Calls.CALL_SCREENING_COMPONENT_NAME.equals(columnToNullify)) {
+            when(cursor.getString(CALLS_CALL_SCREENING_COMPONENT_NAME_COLUMN_INDEX)).thenReturn(
+                null);
+        } else {
+            when(cursor.getString(CALLS_CALL_SCREENING_COMPONENT_NAME_COLUMN_INDEX)).thenReturn(
+                CALL_CALL_SCREENING_COMPONENT_NAME);
+        }
+
+        int CALLS_MISSED_REASON_COLUMN_INDEX = 18;
+        String CALL_MISSED_REASON = "CALL_MISSED_REASON";
+        when(cursor.getColumnIndex(CallLog.Calls.MISSED_REASON)).thenReturn(
+            CALLS_MISSED_REASON_COLUMN_INDEX);
+        if (CallLog.Calls.MISSED_REASON.equals(columnToNullify)) {
+            when(cursor.getString(CALLS_MISSED_REASON_COLUMN_INDEX)).thenReturn(
+                null);
+        } else {
+            when(cursor.getString(CALLS_MISSED_REASON_COLUMN_INDEX)).thenReturn(
+                CALL_MISSED_REASON);
+        }
+
+        int CALLS_IS_PHONE_ACCOUNT_MIGRATION_PENDING_COLUMN_INDEX = 19;
+        int CALL_IS_PHONE_ACCOUNT_MIGRATION_PENDING = 0;
+        when(cursor.getColumnIndex(CallLog.Calls.IS_PHONE_ACCOUNT_MIGRATION_PENDING)).thenReturn(
+            CALLS_IS_PHONE_ACCOUNT_MIGRATION_PENDING_COLUMN_INDEX);
+        when(cursor.getInt(CALLS_IS_PHONE_ACCOUNT_MIGRATION_PENDING_COLUMN_INDEX)).thenReturn(
+            CALL_IS_PHONE_ACCOUNT_MIGRATION_PENDING);
     }
 
     private static Call makeCall(int id, long date, long duration, String number) {
