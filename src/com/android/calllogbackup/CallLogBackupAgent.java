@@ -646,7 +646,7 @@ public class CallLogBackupAgent extends BackupAgent {
             if (isDebug()) {
                 Log.d(TAG, "Wrote call to backup: " + call + " with byte array: " + baos);
             }
-        } catch (IOException e) {
+        } catch (Exception e) {
             mBackupRestoreEventLoggerProxy.logItemsBackupFailed(
                     CALLLOGS, /* count */ 1, ERROR_BACKUP_CALL_FAILED);
             Log.e(TAG, "Failed to backup call: " + call, e);
