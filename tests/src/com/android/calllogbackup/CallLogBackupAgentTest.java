@@ -233,6 +233,21 @@ public class CallLogBackupAgentTest extends AndroidTestCase {
         assertEquals(backupRestoreLoggerFailCount, 1);
     }
 
+    public void testRunBackup_OneNewCall_NullBackupDataOutput() throws Exception {
+        CallLogBackupState state = new CallLogBackupState();
+        state.version = CallLogBackupAgent.VERSION;
+        state.callIds = new TreeSet<>();
+        List<Call> calls = new LinkedList<>();
+        calls.add(makeCall(101, 0L, 0L, "555-5555"));
+
+        // Invoke runBackup() with a null value for BackupDataOutput causing an exception:
+        mCallLogBackupAgent.runBackup(state, null, calls);
+
+        // Ensure the {@link BackupRestoreEventLogger} is informed of the failed backed up call:
+        assertEquals(backupRestoreLoggerSuccessCount, 0);
+        assertEquals(backupRestoreLoggerFailCount, 1);
+    }
+
     public void testRunBackup_OneNewCall() throws Exception {
         CallLogBackupState state = new CallLogBackupState();
         state.version = CallLogBackupAgent.VERSION;
