@@ -302,6 +302,7 @@ public class CallLogBackupAgent extends BackupAgent {
                 // This call still exists in the current call log so delete it from the
                 // "callsToRemove" set since we want to keep it.
                 callsToRemove.remove(call.id);
+                mBackupRestoreEventLoggerProxy.logItemsBackedUp(CALLLOGS, /* count */ 1);
             }
         }
 
