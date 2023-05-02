@@ -371,6 +371,10 @@ public class CallLogBackupAgentTest extends AndroidTestCase {
 
         mCallLogBackupAgent.runBackup(state, mBackupDataOutput, calls);
 
+        // Ensure the {@link BackupRestoreEventLogger} is informed of the 2 backed up calls:
+        assertEquals(backupRestoreLoggerSuccessCount, 2);
+        assertEquals(backupRestoreLoggerFailCount, 0);
+
         InOrder inOrder = Mockito.inOrder(mBackupDataOutput);
         inOrder.verify(mBackupDataOutput).writeEntityHeader(eq("102"), Matchers.anyInt());
         inOrder.verify(mBackupDataOutput).
