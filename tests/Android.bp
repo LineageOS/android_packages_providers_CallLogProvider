@@ -7,8 +7,8 @@ package {
 android_test {
     name: "CallLogBackupTests",
     libs: [
-        "android.test.runner",
-        "android.test.base",
+        "android.test.runner.stubs.system",
+        "android.test.base.stubs.system",
     ],
     // Only compile source java files in this apk.
     srcs: ["src/**/*.java"],
