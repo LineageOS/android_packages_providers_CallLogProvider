@@ -17,6 +17,7 @@
 package com.android.calllogbackup;
 
 import static android.provider.CallLog.Calls.MISSED_REASON_NOT_MISSED;
+import static com.android.calllogbackup.Flags.callLogRestoreDeduplicationEnabled;
 
 import android.app.backup.BackupAgent;
 import android.app.backup.BackupDataInput;
@@ -143,6 +144,10 @@ public class CallLogBackupAgent extends BackupAgent {
 
     static final String TELEPHONY_PHONE_ACCOUNT_HANDLE_COMPONENT_NAME =
             "com.android.phone/com.android.services.telephony.TelephonyConnectionService";
+
+    @VisibleForTesting
+    static final String SELECTION_CALL_DATE_AND_NUMBER =
+            CallLog.Calls.DATE + " = ? AND " + CallLog.Calls.NUMBER + " = ?";
 
     @VisibleForTesting
     protected Map<Integer, String> mSubscriptionInfoMap;
@@ -285,10 +290,12 @@ public class CallLogBackupAgent extends BackupAgent {
         while (data.readNextHeader()) {
             Call call = readCallFromData(data);
             if (call != null && call.type != Calls.VOICEMAIL_TYPE) {
-                writeCallToProvider(call);
-                mBackupRestoreEventLoggerProxy.logItemsRestored(CALLLOGS, /* count */ 1);
-                if (isDebug()) {
-                    Log.d(TAG, "Restored call: " + call);
+                if (!callLogRestoreDeduplicationEnabled() || !isDuplicateCall(call)) {
+                    writeCallToProvider(call);
+                    mBackupRestoreEventLoggerProxy.logItemsRestored(CALLLOGS, /* count */ 1);
+                    if (isDebug()) {
+                        Log.d(TAG, "Restored call: " + call);
+                    }
                 }
             }
         }
@@ -356,7 +363,22 @@ public class CallLogBackupAgent extends BackupAgent {
         return calls;
     }
 
-    private void writeCallToProvider(Call call) {
+    private boolean isDuplicateCall(Call call) {
+        // Build the query selection
+        String[] selectionArgs = new String[]{String.valueOf(call.date), call.number};
+
+        // Query the call log provider. We only need to check for the existence of a call with
+        // the same date and number, so we only select the _ID column.
+        try (Cursor cursor = getContentResolver().query(CallLog.Calls.CONTENT_URI,
+                new String[]{CallLog.Calls._ID}, SELECTION_CALL_DATE_AND_NUMBER,
+                selectionArgs, /* sortOrder */ null)) {
+
+            return cursor != null && cursor.moveToFirst();
+        }
+    }
+
+    @VisibleForTesting
+    void writeCallToProvider(Call call) {
         Long dataUsage = call.dataUsage == 0 ? null : call.dataUsage;
 
         PhoneAccountHandle handle = null;

@@ -8,6 +8,10 @@ android_app {
     // Only compile source java files in this apk.
     srcs: ["src/**/*.java"],
 
+    static_libs: [
+        "calllogbackup_flags_java_lib",
+    ],
+
     // The Jacoco tool analyzes code coverage when running unit tests on the
     // application. This configuration line selects which packages will be analyzed,
     // leaving out code which is tested by other means (e.g. static libraries) that
@@ -23,4 +27,16 @@ android_app {
         proguard_flags_files: ["proguard.flags"],
     },
 
+}
+
+java_aconfig_library {
+    name: "calllogbackup_flags_java_lib",
+    aconfig_declarations: "calllogbackup_flags",
+}
+
+aconfig_declarations {
+    name: "calllogbackup_flags",
+    container: "system",
+    package: "com.android.calllogbackup",
+    srcs: ["**/calllogbackup_flags.aconfig"],
 }

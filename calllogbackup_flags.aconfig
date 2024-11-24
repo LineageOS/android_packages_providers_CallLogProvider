@@ -1,0 +1,9 @@
+package: "com.android.calllogbackup"
+container: "system"
+
+flag {
+    name: "call_log_restore_deduplication_enabled"
+    namespace: "telecom"
+    description: "Enables deduplication of call log entries during restore operations to prevent duplicate entries."
+    bug: "374931480"
+}
