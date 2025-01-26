@@ -18,6 +18,7 @@ package com.android.calllogbackup;
 
 import static android.provider.CallLog.Calls.MISSED_REASON_NOT_MISSED;
 import static com.android.calllogbackup.Flags.callLogRestoreDeduplicationEnabled;
+import static com.android.calllogbackup.Flags.batchDeduplicationEnabled;
 
 import android.app.backup.BackupAgent;
 import android.app.backup.BackupDataInput;
@@ -48,6 +49,7 @@ import java.io.EOFException;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.HashMap;
@@ -112,6 +114,8 @@ public class CallLogBackupAgent extends BackupAgent {
     }
 
     private static final String TAG = "CallLogBackupAgent";
+
+    private static final int CALL_LOG_DEDUPLICATION_BATCH_SIZE = 250;
 
     /** Data types and errors used when reporting B&R success rate and errors.  */
     @BackupRestoreEventLogger.BackupRestoreDataType
@@ -282,9 +286,36 @@ public class CallLogBackupAgent extends BackupAgent {
     @Override
     public void onRestore(BackupDataInput data, int appVersionCode, ParcelFileDescriptor newState)
             throws IOException {
-
         if (isDebug()) {
             Log.d(TAG, "Performing Restore");
+        }
+
+        if (callLogRestoreDeduplicationEnabled() && batchDeduplicationEnabled()) {
+            if (hasExistingCallLogs()) {
+                Map<String, Call> callMap = new HashMap<>();
+
+                while (data.readNextHeader()) {
+                    Call call = readCallFromData(data);
+                    if (call != null && call.type != Calls.VOICEMAIL_TYPE) {
+                        String key = getCallKey(call.date, call.number);
+                        callMap.put(key, call);
+
+                        if (callMap.size() >= getBatchSize()) {
+                            restoreCallBatch(callMap);
+                            // Clear the map for the next batch
+                            callMap.clear();
+                        }
+                    }
+                }
+
+                if (!callMap.isEmpty()) {
+                    restoreCallBatch(callMap);
+                }
+            } else {
+                // No existing call logs, so no need for deduplication
+                performRestoreWithoutDeduplication(data);
+            }
+            return;
         }
 
         while (data.readNextHeader()) {
@@ -299,6 +330,103 @@ public class CallLogBackupAgent extends BackupAgent {
                 }
             }
         }
+    }
+
+    private void restoreCallBatch(Map<String, Call> callMap) {
+        removeDuplicateCalls(callMap);
+
+        for (Call nonDuplicateCall : callMap.values()) {
+            writeAndLogCall(nonDuplicateCall);
+        }
+    }
+
+    private void removeDuplicateCalls(Map<String, Call> callMap) {
+        // Build the selection clause for the query. This clause will look like:
+        // ((date = ? AND number = ?) OR (date = ? AND number = ?) OR ...)
+        // where the placeholders (?) will be replaced with the date and number of each call
+        // in the callMap.
+        StringBuilder selection = new StringBuilder();
+        selection.append(" (");
+
+        String[] selectionArgs = new String[callMap.size() * 2];
+        int argIndex = 0;
+
+        for (Call call : callMap.values()) {
+            if (argIndex > 0) {
+                selection.append(" OR ");
+            }
+            selection.append("(");
+            selection.append(SELECTION_CALL_DATE_AND_NUMBER);
+            selection.append(")");
+            selectionArgs[argIndex++] = String.valueOf(call.date);
+            selectionArgs[argIndex++] = call.number;
+        }
+        selection.append(")");
+
+        // Query the call log and check for duplicates
+        try (Cursor cursor = getContentResolver().query(CallLog.Calls.CONTENT_URI,
+                new String[]{CallLog.Calls.DATE, CallLog.Calls.NUMBER},
+                selection.toString(), selectionArgs, /* sortOrder */ null)) {
+
+            if (cursor != null && cursor.moveToFirst()) {
+                do {
+                    long callLogDate = cursor.getLong(cursor.getColumnIndex(CallLog.Calls.DATE));
+                    String callLogNumber = cursor.getString(
+                            cursor.getColumnIndex(CallLog.Calls.NUMBER));
+                    String key = getCallKey(callLogDate, callLogNumber);
+
+                    callMap.remove(key);
+                } while (cursor.moveToNext());
+            }
+        }
+    }
+
+    private boolean isDuplicateCall(Call call) {
+        // Build the query selection
+        String[] selectionArgs = new String[]{String.valueOf(call.date), call.number};
+
+        // Query the call log provider. We only need to check for the existence of a call with
+        // the same date and number, so we only select the _ID column.
+        try (Cursor cursor = getContentResolver().query(CallLog.Calls.CONTENT_URI,
+                new String[]{CallLog.Calls._ID}, SELECTION_CALL_DATE_AND_NUMBER,
+                selectionArgs, /* sortOrder */ null)) {
+
+            return cursor != null && cursor.moveToFirst();
+        }
+    }
+
+    private void performRestoreWithoutDeduplication(BackupDataInput data) throws IOException {
+        while (data.readNextHeader()) {
+            Call call = readCallFromData(data);
+            if (call != null && call.type != Calls.VOICEMAIL_TYPE) {
+                writeAndLogCall(call);
+            }
+        }
+    }
+
+    private void writeAndLogCall(Call call) {
+        writeCallToProvider(call);
+        mBackupRestoreEventLoggerProxy.logItemsRestored(CALLLOGS, /* count */ 1);
+        if (isDebug()) {
+            Log.d(TAG, "Restored call: " + call);
+        }
+    }
+
+    private boolean hasExistingCallLogs() {
+        try (Cursor cursor = getContentResolver().query(CallLog.Calls.CONTENT_URI,
+                new String[]{CallLog.Calls._ID}, /* selection */ null, /* selectionArgs */
+                null, /* sortOrder */ null)) {
+            return cursor != null && cursor.moveToFirst();
+        }
+    }
+
+    @VisibleForTesting
+    int getBatchSize() {
+        return CALL_LOG_DEDUPLICATION_BATCH_SIZE;
+    }
+
+    private String getCallKey(long date, String number) {
+        return date + "_" + number;
     }
 
     @VisibleForTesting
@@ -361,20 +489,6 @@ public class CallLogBackupAgent extends BackupAgent {
         }
 
         return calls;
-    }
-
-    private boolean isDuplicateCall(Call call) {
-        // Build the query selection
-        String[] selectionArgs = new String[]{String.valueOf(call.date), call.number};
-
-        // Query the call log provider. We only need to check for the existence of a call with
-        // the same date and number, so we only select the _ID column.
-        try (Cursor cursor = getContentResolver().query(CallLog.Calls.CONTENT_URI,
-                new String[]{CallLog.Calls._ID}, SELECTION_CALL_DATE_AND_NUMBER,
-                selectionArgs, /* sortOrder */ null)) {
-
-            return cursor != null && cursor.moveToFirst();
-        }
     }
 
     @VisibleForTesting
