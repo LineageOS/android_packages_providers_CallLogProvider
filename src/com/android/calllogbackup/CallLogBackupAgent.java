@@ -37,6 +37,7 @@ import android.telephony.SubscriptionManager;
 import android.util.Log;
 
 import com.android.internal.annotations.VisibleForTesting;
+import com.android.server.telecom.util.CallLogUtils;
 
 import java.io.BufferedOutputStream;
 import java.io.ByteArrayInputStream;
@@ -503,8 +504,8 @@ public class CallLogBackupAgent extends BackupAgent {
         boolean addForAllUsers = call.addForAllUsers == 1;
 
         // We backup the calllog in the user running this backup agent, so write calls to this user.
-        CallLog.AddCallParams.AddCallParametersBuilder builder =
-                new CallLog.AddCallParams.AddCallParametersBuilder();
+        CallLogUtils.AddCallParams.AddCallParametersBuilder builder =
+                new CallLogUtils.AddCallParams.AddCallParametersBuilder();
         builder.setCallerInfo(null);
         builder.setNumber(call.number);
         builder.setPostDialDigits(call.postDialDigits);
@@ -527,7 +528,7 @@ public class CallLogBackupAgent extends BackupAgent {
         builder.setIsBusinessCall(call.isBusinessCall == 1);
         builder.setAssertedDisplayName(call.assertedDisplayName);
 
-        Calls.addCall(this, builder.build());
+        CallLogUtils.addCall(this, builder.build());
     }
 
     @VisibleForTesting
