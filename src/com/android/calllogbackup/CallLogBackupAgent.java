@@ -92,6 +92,7 @@ public class CallLogBackupAgent extends BackupAgent {
         int isPhoneAccountMigrationPending;
         int isBusinessCall;
         String assertedDisplayName = "";
+        String uuid = "";
 
         @Override
         public String toString() {
@@ -136,7 +137,7 @@ public class CallLogBackupAgent extends BackupAgent {
 
     /** Current version of CallLogBackup. Used to track the backup format. */
     @VisibleForTesting
-    static final int VERSION = 1010;
+    static final int VERSION = 1011;
     /** Version indicating that there exists no previous backup entry. */
     @VisibleForTesting
     static final int VERSION_NO_PREVIOUS_STATE = 0;
@@ -180,7 +181,8 @@ public class CallLogBackupAgent extends BackupAgent {
         CallLog.Calls.MISSED_REASON,
         CallLog.Calls.IS_PHONE_ACCOUNT_MIGRATION_PENDING,
         CallLog.Calls.IS_BUSINESS_CALL,
-        CallLog.Calls.ASSERTED_DISPLAY_NAME
+        CallLog.Calls.ASSERTED_DISPLAY_NAME,
+        CallLog.Calls.UUID
     };
 
     /**
@@ -527,6 +529,7 @@ public class CallLogBackupAgent extends BackupAgent {
         builder.setIsPhoneAccountMigrationPending(call.isPhoneAccountMigrationPending);
         builder.setIsBusinessCall(call.isBusinessCall == 1);
         builder.setAssertedDisplayName(call.assertedDisplayName);
+        builder.setUuid(call.uuid);
 
         CallLogUtils.addCall(this, builder.build());
     }
@@ -674,6 +677,10 @@ public class CallLogBackupAgent extends BackupAgent {
                 call.isBusinessCall = dataInput.readInt();
                 call.assertedDisplayName = readString(dataInput);
             }
+
+            if (version >= 1011) {
+                call.uuid = readString(dataInput);
+            }
             /**
              * In >=T Android, Telephony PhoneAccountHandle must use SubId as the ID (the unique
              * identifier). Any version of Telephony call logs that are restored in >=T Android
@@ -753,6 +760,7 @@ public class CallLogBackupAgent extends BackupAgent {
         call.isBusinessCall = cursor.getInt(cursor.getColumnIndex(CallLog.Calls.IS_BUSINESS_CALL));
         call.assertedDisplayName =
                 cursor.getString(cursor.getColumnIndex(CallLog.Calls.ASSERTED_DISPLAY_NAME));
+        call.uuid = cursor.getString(cursor.getColumnIndex(CallLog.Calls.UUID));
         /*
          * Starting Android T, the ID of Telephony PhoneAccountHandle need to migrate from IccId
          * to SubId. Because the mapping between IccId and SubId in different devices is different,
@@ -829,6 +837,7 @@ public class CallLogBackupAgent extends BackupAgent {
 
             data.writeInt(call.isBusinessCall);
             writeString(data, call.assertedDisplayName);
+            writeString(data, call.uuid);
 
             data.flush();
 
