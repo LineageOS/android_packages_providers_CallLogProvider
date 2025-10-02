@@ -50,7 +50,7 @@ import java.io.EOFException;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.HashMap;
@@ -142,6 +142,13 @@ public class CallLogBackupAgent extends BackupAgent {
     /** Version indicating that there exists no previous backup entry. */
     @VisibleForTesting
     static final int VERSION_NO_PREVIOUS_STATE = 0;
+
+    /**
+     * Backup versions that do not significantly change the structure of the call log database and
+     * it is generally preferable to allow the restore knowing that those new columns will be
+     * skipped in the restore.
+     */
+    static final List<Integer> ACCEPTABLE_DOWNGRADE_VERSIONS = Arrays.asList(1010, 1011, 1012);
 
     static final String NO_OEM_NAMESPACE = "no-oem-namespace";
 
@@ -598,11 +605,9 @@ public class CallLogBackupAgent extends BackupAgent {
 
             int version = dataInput.readInt();
 
-            // Don't allow downgrades when restoring except when the version is 1010; that version
-            // adds some rather inconsequential columns to the call log database and it is generally
-            // preferable to allow the restore knowing that those new columns will be skipped in the
-            // restore.
-            if (version > VERSION && version != 1010) {
+            // Don't allow downgrades when restoring except when the version is one that is
+            // specifically marked as safe to restore from.
+            if (version > VERSION && !ACCEPTABLE_DOWNGRADE_VERSIONS.contains(version)) {
                 // If somehow we got a backed up row that is newer than the supported file format
                 // we know of, we will log an error and return null to represent an invalid item.
                 String errorMessage = "Backup version " + version + " is newer than the current "
@@ -611,6 +616,15 @@ public class CallLogBackupAgent extends BackupAgent {
                 mBackupRestoreEventLoggerProxy.logItemsRestoreFailed(CALLLOGS, 1,
                         errorMessage);
                 return null;
+            }
+
+            if (isDebug()) {
+                Log.d(
+                        TAG,
+                        "Restoring from backup version "
+                                + version
+                                + ", current version: "
+                                + VERSION);
             }
 
             if (version >= 1) {
