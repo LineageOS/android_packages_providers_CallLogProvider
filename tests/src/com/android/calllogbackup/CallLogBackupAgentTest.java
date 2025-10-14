@@ -63,6 +63,7 @@ import java.io.DataOutputStream;
 import java.io.EOFException;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -678,6 +679,142 @@ public class CallLogBackupAgentTest {
         assertEquals(initialCallLogCount, getCallLogCount(contentResolver));
     }
 
+    @Test
+    public void testRestore_SortsByDateDescending() throws Exception {
+        CallOrderCaptureAgent backupAgent = new CallOrderCaptureAgent();
+        backupAgent.setBackupRestoreEventLoggerProxy(mBackupRestoreEventLoggerProxy);
+        backupAgent.attach(mContext);
+
+        Call callOld = makeCall(1, 1000L, 60, "555-0001"); // Oldest
+        Call callMedium = makeCall(3, 2000L, 60, "555-0003"); // Middle
+        Call callNew = makeCall(2, 3000L, 60, "555-0002"); // Newest
+
+        // Provide them in a non-sorted order
+        List<Call> callsToRestore = ImmutableList.of(callOld, callNew, callMedium);
+        BackupDataInput backupDataInput = mockBackupDataInputWithCalls(callsToRestore);
+
+        backupAgent.onRestore(backupDataInput, 0, null);
+
+        List<Call> restoredCalls = backupAgent.restoredCalls;
+        assertEquals(3, restoredCalls.size());
+        // Check that the first call restored is the newest one
+        assertEquals(callNew.date, restoredCalls.get(0).date);
+        // Check that the second call restored is the medium one
+        assertEquals(callMedium.date, restoredCalls.get(1).date);
+        // Check that the last call restored is the oldest one
+        assertEquals(callOld.date, restoredCalls.get(2).date);
+    }
+
+    @Test
+    public void testRestore_MoreThanMaxCalls_RestoresOnlyLatest() throws Exception {
+        final int MAX_CALLS_TO_RESTORE = 3000;
+        final int EXTRA_CALLS = 5;
+
+        CallOrderCaptureAgent backupAgent = new CallOrderCaptureAgent();
+        backupAgent.setBackupRestoreEventLoggerProxy(mBackupRestoreEventLoggerProxy);
+        backupAgent.attach(mContext);
+
+        // Create a list of old calls that should be filtered out.
+        List<Call> oldCalls = new ArrayList<>();
+        for (int i = 0; i < EXTRA_CALLS; i++) {
+            // Dates will be 1000, 1001, 1002, 1003, 1004
+            oldCalls.add(makeCall(i, 1000L + i, 60, "555-OLD-" + i));
+        }
+
+        // Create a list of new calls that should be kept.
+        List<Call> newCalls = new ArrayList<>();
+        for (int i = 0; i < MAX_CALLS_TO_RESTORE; i++) {
+            // Dates will be 2000, 2001, ..., 4999
+            newCalls.add(makeCall(100 + i, 2000L + i, 60, "555-NEW-" + i));
+        }
+
+        // Construct the final list in a specific, non-sorted order to test the filtering.
+        List<Call> allCalls = new ArrayList<>();
+        // Add some old calls at the beginning
+        allCalls.add(oldCalls.get(0));
+        allCalls.add(oldCalls.get(1));
+        // Add all new calls
+        allCalls.addAll(newCalls);
+        // Add some old calls at the end
+        allCalls.add(oldCalls.get(2));
+        allCalls.add(oldCalls.get(3));
+        allCalls.add(oldCalls.get(4));
+        BackupDataInput backupDataInput = mockBackupDataInputWithCalls(allCalls);
+
+        backupAgent.onRestore(backupDataInput, 0, null);
+
+        List<Call> restoredCalls = backupAgent.restoredCalls;
+        assertEquals(MAX_CALLS_TO_RESTORE, restoredCalls.size());
+        long oldestRestoredDate = restoredCalls.get(restoredCalls.size() - 1).date;
+        assertEquals(2000L, oldestRestoredDate);
+        // The newest call should be first in the list.
+        assertEquals(4999L, restoredCalls.get(0).date);
+        // The oldest call in the restored list should be the one with date 2000
+        assertEquals(2000L, restoredCalls.get(restoredCalls.size() - 1).date);
+    }
+
+    @Test
+    public void testGetAllCallLogEntries_WithVoicemails_ReturnsLatestNonVoicemailCalls() {
+        final int MAX_CALL_LOGS = 3000;
+        final int EXTRA_CALLS = 5; // Old calls that shouldn't be backed up.
+        final int VOICEMAIL_COUNT = 5; // Recent calls that are voicemails and should be skipped.
+        final int TOTAL_CALLS = MAX_CALL_LOGS + EXTRA_CALLS + VOICEMAIL_COUNT;
+
+        FakeCallLogBackupAgent backupAgent = new FakeCallLogBackupAgent();
+        backupAgent.attach(mContext);
+        ContentResolver contentResolver = backupAgent.getContentResolver();
+
+        // Create and insert a list of calls
+        List<Call> allCalls = new ArrayList<>();
+        for (int i = 0; i < TOTAL_CALLS; i++) {
+            allCalls.add(makeCall(i, 1000L + i, 60, "555-ENTRY-" + i));
+        }
+
+        // Create ContentValues for all calls
+        ContentValues[] valuesArray = new ContentValues[TOTAL_CALLS];
+        for (int i = 0; i < TOTAL_CALLS; i++) {
+            Call call = allCalls.get(i);
+            ContentValues values = new ContentValues();
+            values.put(CallLog.Calls.NUMBER, call.number);
+            values.put(CallLog.Calls.DATE, call.date);
+            values.put(CallLog.Calls.DURATION, call.duration);
+            // Make the most recent calls voicemails.
+            if (i >= TOTAL_CALLS - VOICEMAIL_COUNT) {
+                values.put(CallLog.Calls.TYPE, CallLog.Calls.VOICEMAIL_TYPE);
+            } else {
+                values.put(CallLog.Calls.TYPE, call.type);
+            }
+            valuesArray[i] = values;
+        }
+        // Insert all calls in a single bulk operation
+        contentResolver.bulkInsert(CallLog.Calls.CONTENT_URI, valuesArray);
+
+        try {
+            Iterable<Call> resultIterable = backupAgent.getAllCallLogEntries();
+            List<Call> resultList = new ArrayList<>();
+            resultIterable.forEach(resultList::add);
+
+            assertEquals(MAX_CALL_LOGS, resultList.size());
+
+            // Check that the calls are sorted by date in descending order
+            long previousDate = Long.MAX_VALUE;
+            for (Call call : resultList) {
+                assertTrue(call.date <= previousDate);
+                previousDate = call.date;
+            }
+
+            // Check the oldest backed up call log. Because the newest N calls were skipped (as they
+            // were voicemails), the selection window should have shifted to include N older calls.
+            // The oldest call should now be the one at index EXTRA_CALLS.
+            long expectedOldestDate = 1000L + EXTRA_CALLS;
+            assertEquals(expectedOldestDate, resultList.get(resultList.size() - 1).date);
+
+        } finally {
+            // Clean up the inserted call logs
+            clearCallLogsByDate(contentResolver, 1000L, 1000L + TOTAL_CALLS - 1);
+        }
+    }
+
     private static void mockCursor(Cursor cursor, boolean isTelephonyComponentName) {
         when(cursor.moveToNext()).thenReturn(true).thenReturn(false);
 
@@ -1070,6 +1207,7 @@ public class CallLogBackupAgentTest {
         c.number = number;
         c.accountComponentName = "account-component";
         c.accountId = "account-id";
+        c.accountAddress = "account-address";
         return c;
     }
 
@@ -1088,6 +1226,16 @@ public class CallLogBackupAgentTest {
                 SELECTION_CALL_DATE_AND_NUMBER, whereArgs, /* sortOrder */ null)) {
             assertEquals(expectedCount, Objects.requireNonNull(cursor).getCount());
         }
+    }
+
+    /**
+     * Clears call logs within a specified date range.
+     * It is much faster than clearCallLogs for a large number of call logs.
+     */
+    private void clearCallLogsByDate(ContentResolver contentResolver, long minDate, long maxDate) {
+        String selection = CallLog.Calls.DATE + " >= ? AND " + CallLog.Calls.DATE + " <= ?";
+        String[] selectionArgs = {String.valueOf(minDate), String.valueOf(maxDate)};
+        contentResolver.delete(CallLog.Calls.CONTENT_URI, selection, selectionArgs);
     }
 
     /**
@@ -1124,6 +1272,19 @@ public class CallLogBackupAgentTest {
         @VisibleForTesting
         int getBatchSize() {
             return TEST_BATCH_SIZE;
+        }
+    }
+
+    /**
+     * A fake agent that captures the calls being restored instead of writing them to the provider.
+     */
+    private static class CallOrderCaptureAgent extends FakeCallLogBackupAgent {
+        final List<Call> restoredCalls = new ArrayList<>();
+
+        @Override
+        protected void writeCallToProvider(Call call) {
+            // Don't write to the real provider, just capture the call
+            restoredCalls.add(call);
         }
     }
 }
