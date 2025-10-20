@@ -50,7 +50,7 @@ import java.io.EOFException;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.HashMap;
@@ -93,6 +93,7 @@ public class CallLogBackupAgent extends BackupAgent {
         int isBusinessCall;
         String assertedDisplayName = "";
         String uuid = "";
+        String preferredDisplayName = "";
 
         @Override
         public String toString() {
@@ -137,10 +138,17 @@ public class CallLogBackupAgent extends BackupAgent {
 
     /** Current version of CallLogBackup. Used to track the backup format. */
     @VisibleForTesting
-    static final int VERSION = 1011;
+    static final int VERSION = 1012;
     /** Version indicating that there exists no previous backup entry. */
     @VisibleForTesting
     static final int VERSION_NO_PREVIOUS_STATE = 0;
+
+    /**
+     * Backup versions that do not significantly change the structure of the call log database and
+     * it is generally preferable to allow the restore knowing that those new columns will be
+     * skipped in the restore.
+     */
+    static final List<Integer> ACCEPTABLE_DOWNGRADE_VERSIONS = Arrays.asList(1010, 1011, 1012);
 
     static final String NO_OEM_NAMESPACE = "no-oem-namespace";
 
@@ -182,7 +190,8 @@ public class CallLogBackupAgent extends BackupAgent {
         CallLog.Calls.IS_PHONE_ACCOUNT_MIGRATION_PENDING,
         CallLog.Calls.IS_BUSINESS_CALL,
         CallLog.Calls.ASSERTED_DISPLAY_NAME,
-        CallLog.Calls.UUID
+        CallLog.Calls.UUID,
+        Calls.PREFERRED_DISPLAY_NAME
     };
 
     /**
@@ -530,6 +539,7 @@ public class CallLogBackupAgent extends BackupAgent {
         builder.setIsBusinessCall(call.isBusinessCall == 1);
         builder.setAssertedDisplayName(call.assertedDisplayName);
         builder.setUuid(call.uuid);
+        builder.setPreferredDisplayName(call.preferredDisplayName);
 
         CallLogUtils.addCall(this, builder.build());
     }
@@ -595,11 +605,9 @@ public class CallLogBackupAgent extends BackupAgent {
 
             int version = dataInput.readInt();
 
-            // Don't allow downgrades when restoring except when the version is 1010; that version
-            // adds some rather inconsequential columns to the call log database and it is generally
-            // preferable to allow the restore knowing that those new columns will be skipped in the
-            // restore.
-            if (version > VERSION && version != 1010) {
+            // Don't allow downgrades when restoring except when the version is one that is
+            // specifically marked as safe to restore from.
+            if (version > VERSION && !ACCEPTABLE_DOWNGRADE_VERSIONS.contains(version)) {
                 // If somehow we got a backed up row that is newer than the supported file format
                 // we know of, we will log an error and return null to represent an invalid item.
                 String errorMessage = "Backup version " + version + " is newer than the current "
@@ -608,6 +616,15 @@ public class CallLogBackupAgent extends BackupAgent {
                 mBackupRestoreEventLoggerProxy.logItemsRestoreFailed(CALLLOGS, 1,
                         errorMessage);
                 return null;
+            }
+
+            if (isDebug()) {
+                Log.d(
+                        TAG,
+                        "Restoring from backup version "
+                                + version
+                                + ", current version: "
+                                + VERSION);
             }
 
             if (version >= 1) {
@@ -680,6 +697,10 @@ public class CallLogBackupAgent extends BackupAgent {
 
             if (version >= 1011) {
                 call.uuid = readString(dataInput);
+            }
+
+            if (version >= 1012) {
+                call.preferredDisplayName = readString(dataInput);
             }
             /**
              * In >=T Android, Telephony PhoneAccountHandle must use SubId as the ID (the unique
@@ -761,6 +782,8 @@ public class CallLogBackupAgent extends BackupAgent {
         call.assertedDisplayName =
                 cursor.getString(cursor.getColumnIndex(CallLog.Calls.ASSERTED_DISPLAY_NAME));
         call.uuid = cursor.getString(cursor.getColumnIndex(CallLog.Calls.UUID));
+        call.preferredDisplayName = cursor.getString(cursor.getColumnIndex(
+                Calls.PREFERRED_DISPLAY_NAME));
         /*
          * Starting Android T, the ID of Telephony PhoneAccountHandle need to migrate from IccId
          * to SubId. Because the mapping between IccId and SubId in different devices is different,
@@ -838,6 +861,7 @@ public class CallLogBackupAgent extends BackupAgent {
             data.writeInt(call.isBusinessCall);
             writeString(data, call.assertedDisplayName);
             writeString(data, call.uuid);
+            writeString(data, call.preferredDisplayName);
 
             data.flush();
 
