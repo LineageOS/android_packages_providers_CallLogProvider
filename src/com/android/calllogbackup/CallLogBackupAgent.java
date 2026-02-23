@@ -18,7 +18,6 @@ package com.android.calllogbackup;
 
 import static android.provider.CallLog.Calls.MISSED_REASON_NOT_MISSED;
 import static com.android.calllogbackup.Flags.batchDeduplicationEnabled;
-import static com.android.calllogbackup.Flags.callLogRestoreDeduplicationEnabled;
 
 import android.app.backup.BackupAgent;
 import android.app.backup.BackupDataInput;
@@ -323,7 +322,7 @@ public class CallLogBackupAgent extends BackupAgent {
 
         List<Call> callsToRestore = getCallsToRestoreFromBackupData(data);
 
-        if (callLogRestoreDeduplicationEnabled() && batchDeduplicationEnabled()) {
+        if (batchDeduplicationEnabled()) {
             if (hasExistingCallLogs()) {
                 Map<String, Call> callMap = new HashMap<>();
 
@@ -347,7 +346,7 @@ public class CallLogBackupAgent extends BackupAgent {
             }
         } else {
             for (Call call : callsToRestore) {
-                if (!callLogRestoreDeduplicationEnabled() || !isDuplicateCall(call)) {
+                if (!isDuplicateCall(call)) {
                     writeAndLogCall(call);
                     if (isDebug()) {
                         Log.d(TAG, "Restored call: " + call);
