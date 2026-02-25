@@ -469,7 +469,6 @@ public class CallLogBackupAgentTest {
     }
 
     @Test
-    @RequiresFlagsEnabled({Flags.FLAG_CALL_LOG_RESTORE_DEDUPLICATION_ENABLED})
     @RequiresFlagsDisabled({Flags.FLAG_BATCH_DEDUPLICATION_ENABLED})
     public void testRestore_DeduplicationEnabled_BatchDisabled_DuplicateEntry_Deduplicates()
             throws Exception {
@@ -508,56 +507,6 @@ public class CallLogBackupAgentTest {
 
             // Assert that the entry matches the mock call
             assertCallCount(contentResolver, call, 1);
-
-            // Assert that the existing entry remains in the database and is unaltered
-            assertCallCount(contentResolver, existingCall, 1);
-        } finally {
-            clearCallLogs(contentResolver, ImmutableList.of(existingCall, call));
-        }
-
-        // Assert that the final count is equal to the initial count
-        assertEquals(initialCallLogCount, getCallLogCount(contentResolver));
-    }
-
-    @Test
-    @RequiresFlagsDisabled({Flags.FLAG_CALL_LOG_RESTORE_DEDUPLICATION_ENABLED})
-    public void testRestore_DuplicateEntry_DeduplicationDisabled_AddsDuplicateEntry()
-            throws Exception {
-        FakeCallLogBackupAgent backupAgent = new FakeCallLogBackupAgent();
-        backupAgent.setBackupRestoreEventLoggerProxy(mBackupRestoreEventLoggerProxy);
-        backupAgent.attach(mContext);
-
-        // Get the initial count of call log entries
-        ContentResolver contentResolver = backupAgent.getContentResolver();
-        int initialCallLogCount = getCallLogCount(contentResolver);
-
-        // Add an existing entry using FakeCallLogBackupAgent.writeCallToProvider
-        // to simulate a call log that was already in the database.
-        Call existingCall = makeCall(/* id */ 100, /* date */ 1122334455L, /* duration */
-                30, /* number */ "555-0000");
-        backupAgent.writeCallToProvider(existingCall);
-
-        //  Call log count after adding the existing entry
-        int callLogCountWithExistingEntry = initialCallLogCount + 1;
-
-        // Create a new mock call
-        Call call = makeCall(/* id */ 101, /* date */ 1234567890L, /* duration */ 60, /* number */
-                "555-4321");
-
-        try {
-            // Restore the same call data twice using different BackupDataInput objects
-            backupAgent.onRestore(
-                    mockBackupDataInputWithCalls(ImmutableList.of(call)), /* appVersionCode */
-                    0, /* newState */ null);
-            backupAgent.onRestore(
-                    mockBackupDataInputWithCalls(ImmutableList.of(call)), /* appVersionCode */
-                    0, /* newState */ null);
-
-            // Assert that two new entries were added
-            assertEquals(callLogCountWithExistingEntry + 2, getCallLogCount(contentResolver));
-
-            // Assert that two entries exist with the same data
-            assertCallCount(contentResolver, call, 2);
 
             // Assert that the existing entry remains in the database and is unaltered
             assertCallCount(contentResolver, existingCall, 1);
@@ -619,8 +568,7 @@ public class CallLogBackupAgentTest {
     }
 
     @Test
-    @RequiresFlagsEnabled({Flags.FLAG_CALL_LOG_RESTORE_DEDUPLICATION_ENABLED,
-            Flags.FLAG_BATCH_DEDUPLICATION_ENABLED})
+    @RequiresFlagsEnabled({Flags.FLAG_BATCH_DEDUPLICATION_ENABLED})
     public void testRestore_DuplicateEntry_BatchDeduplicationEnabled_Deduplicates()
             throws Exception {
         FakeCallLogBackupAgent backupAgent = new FakeCallLogBackupAgent();
